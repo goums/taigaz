@@ -543,7 +543,7 @@ export default function App() {
                     </div>
                   )}
                 </div>
-                <span className="wallet-pill" style={{ borderColor: "var(--emerald)", color: "var(--emerald-deep)" }}>
+                <span className="wallet-pill owned-pill" style={{ borderColor: "var(--emerald)", color: "var(--emerald-deep)" }}>
                   🌿 <span>{t("owned_label")}</span> <b>{state.distinct}</b> / <b>{TAIGAZ.length}</b>
                 </span>
               </div>
