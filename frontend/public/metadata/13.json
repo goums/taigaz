@@ -1,0 +1,16 @@
+{
+  "name": "Taigaz — Gaming",
+  "description": "A commemorative NFT from the Taigaz wedding collection. Collect one of every design to complete the set.",
+  "image": "https://taigaz.vercel.app/nft/15_gaming.png",
+  "collection": "Taigaz",
+  "attributes": [
+    {
+      "trait_type": "Design",
+      "value": "Gaming"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Common"
+    }
+  ]
+}

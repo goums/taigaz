@@ -1,0 +1,16 @@
+{
+  "name": "Taigaz — Fitness",
+  "description": "A commemorative NFT from the Taigaz wedding collection. Collect one of every design to complete the set.",
+  "image": "https://taigaz.vercel.app/nft/17_fitness.png",
+  "collection": "Taigaz",
+  "attributes": [
+    {
+      "trait_type": "Design",
+      "value": "Fitness"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Common"
+    }
+  ]
+}

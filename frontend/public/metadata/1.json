@@ -1,0 +1,16 @@
+{
+  "name": "Taigaz — Martial Art",
+  "description": "A commemorative NFT from the Taigaz wedding collection. Collect one of every design to complete the set.",
+  "image": "https://taigaz.vercel.app/nft/03_martial_art.png",
+  "collection": "Taigaz",
+  "attributes": [
+    {
+      "trait_type": "Design",
+      "value": "Martial Art"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Common"
+    }
+  ]
+}

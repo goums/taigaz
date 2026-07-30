@@ -1,0 +1,16 @@
+{
+  "name": "Taigaz — Blueprint",
+  "description": "A commemorative NFT from the Taigaz wedding collection. Collect one of every design to complete the set.",
+  "image": "https://taigaz.vercel.app/nft/14_blueprint.png",
+  "collection": "Taigaz",
+  "attributes": [
+    {
+      "trait_type": "Design",
+      "value": "Blueprint"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Rare"
+    }
+  ]
+}

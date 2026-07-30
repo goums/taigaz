@@ -1,0 +1,16 @@
+{
+  "name": "Taigaz — Golden Queen",
+  "description": "A commemorative NFT from the Taigaz wedding collection. Collect one of every design to complete the set.",
+  "image": "https://taigaz.vercel.app/nft/01_golden_queen.png",
+  "collection": "Taigaz",
+  "attributes": [
+    {
+      "trait_type": "Design",
+      "value": "Golden Queen"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Legendary"
+    }
+  ]
+}

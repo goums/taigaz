@@ -1,0 +1,1042 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Taigaz — Mint your corgi</title>
+<style>
+@font-face{font-family:"Unbounded";font-style:normal;font-weight:400 900;font-display:swap;src:url(collection_assets/unbounded.woff2) format("woff2");}
+</style>
+<style>
+  :root{
+    /* ── Base palette — single source of truth ─────────────── */
+    --c-green:#2c5954;        /* dark emerald · brand + headings */
+    --c-green-deep:#1e3f3b;
+    --c-green-mid:#5f7d78;     /* muted text */
+    --c-green-soft:#a6cfb4;    /* page background */
+    --c-green-pale:#d1e7d7;    /* light green */
+    --c-green-cream:#f4faf5;   /* panel tint */
+    --c-ink:#294c48;           /* body text on light */
+
+    --c-pink:#eab8b9;          /* sakura */
+    --c-pink-deep:#d98a97;
+    --c-pink-pale:#f6e2e3;
+
+    --c-mauve:#d1b3e6;
+    --c-mauve-deep:#a978cf;
+    --c-purple:#7a5cc6;
+    --c-purple-deep:#5a3ea6;
+
+    --c-gold:#f4c430;          /* golden-queen accent */
+    --c-gold-deep:#c79a3f;
+    --c-gold-light:#ffe9a8;
+    --c-gold-pale:#fff2b0;
+    --c-gold-text:#8a5a00;
+
+    --c-ok:#4ccf7f;            /* connected status */
+
+    /* ── Semantic aliases (used throughout) ────────────────── */
+    --sakura:var(--c-pink);
+    --sakura-deep:var(--c-pink-deep);
+    --plum:var(--c-green);
+    --ink:var(--c-ink);
+    --muted:var(--c-green-mid);
+    --cream:var(--c-green-cream);
+    --gold:var(--c-gold);
+    --mauve:var(--c-mauve);
+    --mauve-deep:var(--c-mauve-deep);
+    --emerald:var(--c-green);
+    --emerald-deep:var(--c-green-deep);
+    --emerald-light:var(--c-green-pale);
+    /* opal — milky iridescent shimmer */
+    --title-grad:linear-gradient(105deg,#f6fbff 0%,#cfeeff 14%,#ffe0f0 34%,#d6ffe6 54%,#e7ddff 74%,#fff4d8 92%,#f6fbff 100%);
+    --title-glow:drop-shadow(0 2px 6px rgba(0,20,25,.55)) drop-shadow(0 0 18px rgba(190,235,255,.6)) drop-shadow(0 0 34px rgba(220,190,255,.4));
+    --panel:rgba(247,252,248,.78);
+    --panel-border:rgba(44,89,84,.20);
+    --shadow:rgba(30,63,59,.30);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:"Unbounded","Hiragino Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(circle at 12% 4%, rgba(234,184,185,.14), transparent 42%),   /* --c-pink */
+      radial-gradient(circle at 90% 8%, rgba(209,179,230,.14), transparent 44%),   /* --c-mauve */
+      linear-gradient(180deg,#0c2620 0%, #123a30 55%, #1b5041 100%);               /* dark emerald */
+    /* lock to the viewport: one full-height gradient, never tiles vertically */
+    background-repeat:no-repeat;
+    background-attachment:fixed;
+    background-size:cover;
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+  /* subtle seigaiha (wave) pattern overlay */
+  body::before{
+    content:"";
+    position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.10;
+    background-image:radial-gradient(circle at 10px 20px, transparent 8px, var(--sakura) 8px, var(--sakura) 9px, transparent 9px);
+    background-size:20px 20px;opacity:.06;
+  }
+  .wrap{position:relative;z-index:1;max-width:960px;margin:-22vw auto 0;padding:0 20px 80px}
+
+  /* full-bleed banner, edge to edge; the card tucks up under its green foot */
+  header.brand{position:relative;z-index:1;margin:0}
+  .hero-banner{
+    position:relative;width:100%;aspect-ratio:1500/620;overflow:hidden;
+  }
+
+  /* full-page fixed background scene (colour variations + sparkles + petals) */
+  .page-scene{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+  .page-svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .sparks circle{animation:twinkle 3.5s ease-in-out infinite}
+  .sparks circle:nth-child(2n){animation-duration:5s;animation-delay:.8s}
+  .sparks circle:nth-child(3n){animation-duration:4.2s;animation-delay:1.6s}
+  @keyframes twinkle{0%,100%{opacity:.25}50%{opacity:.95}}
+
+  /* falling cherry-blossom petals & leaves */
+  .hero-flakes{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+  .flake{position:absolute;top:-8%;will-change:transform,top;animation:fall linear infinite}
+  .flake.petal{width:14px;height:14px;border-radius:150% 0 150% 0;
+    background:radial-gradient(circle at 32% 28%,#ffe1ea,#eab8b9);box-shadow:0 0 6px rgba(255,220,230,.5)}
+  .flake.leaf{width:16px;height:9px;border-radius:0 100% 0 100%;
+    background:linear-gradient(120deg,#8fd4a6,#3f8f6a)}
+  @keyframes fall{
+    0%{top:-8%;transform:translateX(0) rotate(0) scale(var(--s,1));opacity:0}
+    12%,88%{opacity:.9}
+    100%{top:108%;transform:translateX(var(--drift,40px)) rotate(360deg) scale(var(--s,1));opacity:0}
+  }
+  .hero-title{position:absolute;inset:0;bottom:24%;display:flex;align-items:center;justify-content:center;gap:min(2.2vw,26px);pointer-events:none}
+  .logo-corgi{
+    display:inline-block;height:clamp(42px,10vw,128px);aspect-ratio:779/965;
+    /* shadow/glow applied on the wrapper so it casts OUTSIDE the masked shape */
+    filter:var(--title-glow) drop-shadow(0 4px 10px rgba(0,0,0,.3));
+  }
+  .logo-corgi-fill{
+    display:block;width:100%;height:100%;
+    /* fill the silhouette with the SAME gradient as the title, via mask */
+    background:var(--title-grad);
+    -webkit-mask:url(collection_assets/corgi_logo.png) center/contain no-repeat;
+    mask:url(collection_assets/corgi_logo.png) center/contain no-repeat;
+  }
+  .hero-title h1{
+    margin:0;
+    font-family:"Unbounded",-apple-system,sans-serif;
+    text-transform:uppercase;font-weight:900;line-height:1;
+    font-size:clamp(42px,10vw,128px);letter-spacing:.03em;
+    /* colorized gradient fill + electric glow */
+    background:var(--title-grad);
+    -webkit-background-clip:text;background-clip:text;
+    color:transparent;-webkit-text-fill-color:transparent;
+    filter:var(--title-glow) drop-shadow(0 4px 10px rgba(0,0,0,.3));
+  }
+  /* on mobile, make the wordmark nearly fill the banner width */
+  @media (max-width:640px){
+    .hero-title{gap:2vw}
+    .hero-title h1{font-size:13vw;letter-spacing:.01em}
+    .logo-corgi{height:11.5vw}
+  }
+  @keyframes flicker{
+    0%,100%{opacity:1}
+    92%{opacity:1}
+    93%{opacity:.72}
+    94%{opacity:1}
+    96%{opacity:.85}
+    97%{opacity:1}
+  }
+
+  .card{
+    /* iridescent (opal) gradient border matching the title */
+    border:2px solid transparent;
+    border-radius:26px;
+    background:
+      linear-gradient(var(--panel),var(--panel)) padding-box,
+      var(--title-grad) border-box;
+    box-shadow:0 18px 40px -12px var(--shadow), inset 0 1px 0 rgba(255,255,255,.08);
+    backdrop-filter:blur(6px);
+    padding:30px;
+  }
+
+  /* ---- connect screen ---- */
+  #connect{text-align:center;padding:56px 30px}
+  #connect .torii{font-size:64px;filter:drop-shadow(0 6px 10px var(--shadow))}
+  .connect-avatar{
+    margin:0 auto 4px;width:150px;height:150px;border-radius:50%;overflow:hidden;
+    border:5px solid #fff;
+    box-shadow:0 12px 26px -12px var(--shadow), 0 0 0 3px var(--sakura), 0 0 26px rgba(209,179,230,.6);
+    animation:floaty 4s ease-in-out infinite;
+  }
+  .connect-avatar img{width:100%;height:100%;object-fit:cover;display:block;opacity:.42}
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+  #connect h2{margin:14px 0 6px;font-size:24px;color:var(--plum);
+    font-family:"Unbounded",-apple-system,sans-serif;font-weight:900;letter-spacing:.01em}
+  #connect p{margin:0 auto 14px;max-width:440px;color:var(--muted);line-height:1.6}
+  .quest-hint{
+    margin:0 auto 26px !important;max-width:400px;padding:12px 18px;border-radius:16px;
+    background:linear-gradient(135deg,rgba(255,243,199,.9),rgba(255,225,150,.9));
+    border:2px solid var(--c-gold);color:var(--c-gold-text) !important;font-size:14px;
+  }
+  .quest-hint b{color:var(--c-gold-text)}
+
+  /* pseudo / nickname input on the connect screen */
+  .nick-input{
+    display:block;width:min(320px,80%);margin:6px auto 20px;padding:13px 18px;
+    border-radius:999px;border:2px solid var(--c-green);
+    background:rgba(255,255,255,.85);color:var(--ink);
+    font-family:inherit;font-weight:700;font-size:15px;text-align:center;outline:none;
+    transition:box-shadow .15s ease,border-color .15s ease;
+  }
+  .nick-input::placeholder{color:#9aa8a5;font-weight:600}
+  .nick-input:focus{border-color:var(--c-green-mid);box-shadow:0 0 0 4px rgba(44,89,84,.2)}
+  .good-luck{margin:18px auto 0 !important;color:var(--c-gold-deep);font-weight:700;font-size:13.5px}
+
+  .save-row{text-align:center;margin-top:26px}
+  .save-btn{font-size:16px;padding:14px 32px}
+  .market-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:16px}
+  /* secondary button style — outlined, no fill */
+  .btn.btn-secondary{
+    background:rgba(255,255,255,.55);color:var(--plum);
+    border:2px solid var(--panel-border);
+    box-shadow:0 6px 16px -10px var(--shadow);
+    font-size:14px;padding:11px 22px;
+  }
+  .btn.btn-secondary:hover{background:#fff;border-color:var(--sakura);transform:translateY(-2px)}
+  .btn.btn-secondary{display:inline-flex;align-items:center;gap:9px}
+  .mk-ico{width:19px;height:19px;flex:0 0 auto;border-radius:5px}
+  .save-note{max-width:420px;margin:14px auto 0;font-size:13px;line-height:1.5;color:var(--muted)}
+
+  /* ── Golden Queen quest box (top) ─────────────────────────── */
+  .quest-box{
+    /* opal iridescent gradient as the box background */
+    margin:0 0 22px;padding:14px 20px;border-radius:20px;
+    border:1px solid rgba(255,255,255,.6);
+    background:var(--title-grad);
+    color:var(--c-gold-deep);text-align:center;font-weight:800;font-size:15px;
+    box-shadow:0 14px 30px -16px var(--shadow), inset 0 1px 0 rgba(255,255,255,.5);
+  }
+  .quest-box .quest-icon{font-size:18px}
+  .quest-find-l1{color:var(--c-green);font-weight:600;font-size:15.5px}
+  .quest-find-l2{font-weight:600;margin-top:2px}
+  /* found state: image + finder */
+  .quest-box.found{
+    display:flex;align-items:center;gap:16px;text-align:left;
+    box-shadow:0 16px 34px -16px var(--shadow);
+    animation:pop .5s cubic-bezier(.2,1.4,.4,1);
+  }
+  .quest-box.found .quest-queen{
+    width:66px;height:66px;flex:0 0 auto;border-radius:50%;object-fit:cover;cursor:pointer;
+    border:3px solid #fff;box-shadow:0 0 0 3px var(--c-gold),0 0 16px rgba(244,196,48,.7);
+    transition:transform .15s ease;
+  }
+  .quest-box.found .quest-queen:hover{transform:scale(1.06)}
+  .quest-box.found .quest-line1{font-size:15px;font-weight:900}
+  .quest-box.found .quest-line2{font-size:13.5px;font-weight:700;margin-top:2px;color:var(--c-gold-deep)}
+  .quest-box.found .quest-line2 b{color:var(--c-gold-deep)}
+
+  .wallet-addr{font-weight:600;font-size:11.5px;opacity:.7}
+
+  .btn{
+    appearance:none;border:none;cursor:pointer;
+    font-family:inherit;font-weight:800;font-size:18px;letter-spacing:.03em;
+    color:#fff;padding:16px 40px;border-radius:999px;
+    background:linear-gradient(135deg,var(--sakura-deep) 0%,var(--mauve-deep) 55%,var(--emerald) 125%);
+    box-shadow:0 10px 22px -8px rgba(44,89,84,.5), inset 0 1px 0 rgba(255,255,255,.4);
+    transition:transform .15s ease, box-shadow .15s ease, filter .15s ease;
+  }
+  .btn:hover{transform:translateY(-2px);box-shadow:0 16px 28px -10px var(--plum)}
+  .btn:active{transform:translateY(0)}
+  .btn:disabled{cursor:not-allowed;filter:grayscale(.4) brightness(1.05);opacity:.7;transform:none;box-shadow:0 6px 14px -8px var(--plum)}
+  .btn.ghost{background:rgba(255,255,255,.06);color:var(--plum);border:2px solid var(--sakura)}
+
+  .hidden{display:none !important}
+
+  /* ---- mint area ---- */
+  #app .topbar{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    margin-bottom:22px;flex-wrap:wrap;
+  }
+  .wallet-pill{
+    display:inline-flex;align-items:center;gap:8px;
+    background:rgba(255,255,255,.7);border:2px solid var(--sakura);border-radius:999px;
+    padding:8px 16px;font-weight:700;font-size:14px;color:var(--plum);
+  }
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--c-ok);box-shadow:0 0 0 4px rgba(76,207,127,.2)}
+
+  .mint-grid{display:grid;grid-template-columns:1fr;gap:26px;align-items:center;text-align:center;perspective:1100px}
+
+  /* reveal card — image + text in one card, like the collection detail modal */
+  .reveal-card{
+    position:relative;width:min(360px,86vw);margin:0 auto;border-radius:26px;overflow:hidden;
+    background:var(--panel);border:1px solid var(--panel-border);
+    box-shadow:0 30px 70px -22px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.4);
+    transform-style:preserve-3d;
+    animation:cardFloat 7s ease-in-out infinite;
+  }
+  /* gentle physical-card tilt (no vertical bobbing) */
+  @keyframes cardFloat{
+    0%   {transform:rotateX(0deg)    rotateY(0deg)}
+    25%  {transform:rotateX(2.6deg)  rotateY(-3.4deg)}
+    50%  {transform:rotateX(0deg)    rotateY(3.4deg)}
+    75%  {transform:rotateX(-2.6deg) rotateY(0deg)}
+    100% {transform:rotateX(0deg)    rotateY(0deg)}
+  }
+  @media (prefers-reduced-motion:reduce){ .reveal-card{animation:none} }
+  .reveal-card.golden{
+    border-color:var(--c-gold);
+    box-shadow:0 0 0 3px var(--c-gold) inset,0 0 40px rgba(244,196,48,.6),0 30px 70px -20px rgba(0,0,0,.5);
+    animation:cardFloat 7s ease-in-out infinite, goldPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes goldPulse{
+    0%,100%{box-shadow:0 0 0 3px var(--c-gold) inset,0 0 40px rgba(244,196,48,.6),0 30px 70px -20px rgba(0,0,0,.5)}
+    50%{box-shadow:0 0 0 3px #fff1b8 inset,0 0 60px rgba(255,215,0,.85),0 30px 70px -20px rgba(0,0,0,.55)}
+  }
+  /* fixed height so the card doesn't jump between placeholder & revealed states */
+  .reveal-info{padding:18px 22px 22px;text-align:center;min-height:118px;
+    display:flex;flex-direction:column;justify-content:center}
+  .taiga-frame{
+    position:relative;width:100%;aspect-ratio:1;overflow:hidden;
+    background:linear-gradient(160deg,var(--c-pink-pale),var(--c-green-pale));
+  }
+  /* periodic light sweep passing over the whole revealed card */
+  .reveal-card.revealed::after{
+    content:"";position:absolute;inset:0;z-index:3;pointer-events:none;border-radius:inherit;
+    background:linear-gradient(105deg,transparent 42%,rgba(255,255,255,.7) 50%,transparent 58%);
+    background-size:250% 100%;background-repeat:no-repeat;
+    mix-blend-mode:screen;
+    animation:nftShine 5s ease-in-out infinite;
+  }
+  @keyframes nftShine{
+    0%,68%{background-position:170% 0}   /* rest */
+    100%{background-position:-40% 0}     /* quick sweep */
+  }
+  .taiga-frame .art{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:150px;user-select:none}
+  .art-img{width:100%;height:100%;object-fit:cover;display:block}
+  .art.is-placeholder .art-img{opacity:.42}
+  .art.summoning .art-img{animation:summonPulse 1.2s ease-in-out infinite}
+  @keyframes summonPulse{0%,100%{opacity:.3;filter:brightness(.9)}50%{opacity:.5;filter:brightness(1.1)}}
+
+  /* ---- Golden Queen special frame ---- */
+  .quest-banner{
+    margin:16px auto 0;max-width:440px;padding:16px 20px;border-radius:18px;
+    background:linear-gradient(135deg,rgba(255,243,199,.95),rgba(255,225,150,.95));
+    border:2px solid var(--c-gold);
+    box-shadow:0 10px 26px -10px rgba(180,130,0,.55), inset 0 1px 0 rgba(255,255,255,.7);
+    animation:pop .6s cubic-bezier(.2,1.4,.4,1);
+  }
+  .quest-title{font-weight:900;font-size:18px;color:var(--c-gold-deep);letter-spacing:.01em;
+    text-shadow:0 1px 0 rgba(255,255,255,.6);animation:questGlow 1.4s ease-in-out infinite}
+  @keyframes questGlow{0%,100%{filter:drop-shadow(0 0 2px rgba(244,196,48,.5))}50%{filter:drop-shadow(0 0 10px rgba(244,196,48,.95))}}
+  .quest-body{margin-top:8px;font-size:13.5px;line-height:1.55;color:var(--c-gold-deep)}
+  .quest-body b{color:var(--c-gold-deep)}
+  .placeholder-art{
+    flex-direction:column;gap:10px;color:var(--plum);
+    background:
+      repeating-linear-gradient(45deg, rgba(255,255,255,.35) 0 14px, transparent 14px 28px);
+  }
+  .placeholder-art .q{font-size:120px;line-height:1}
+  .placeholder-art .lbl{font-size:15px;letter-spacing:.3em;text-transform:uppercase;font-weight:800}
+
+  .reveal-pop{animation:pop .6s cubic-bezier(.2,1.4,.4,1)}
+  @keyframes pop{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+
+  .status{min-height:22px;font-weight:700;color:var(--sakura-deep);letter-spacing:.02em;margin-top:8px}
+  /* name & rarity match the detail modal's typography */
+  .taiga-rarity{font-size:12px;font-weight:800;letter-spacing:.22em;text-transform:uppercase}
+  .taiga-name{font-size:26px;font-weight:900;color:var(--plum);margin:4px 0 0;
+    font-family:"Unbounded",-apple-system,sans-serif;letter-spacing:.01em}
+  .taiga-meta{margin-top:8px;color:var(--muted);font-weight:600;font-size:14px}
+
+  .spinner{width:40px;height:40px;border-radius:50%;border:5px solid rgba(255,111,145,.25);border-top-color:var(--plum);animation:spin .8s linear infinite;position:absolute;top:calc(50% - 20px);left:calc(50% - 20px)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ---- collection ---- */
+  .collection-card{margin-top:26px}
+  .section-title{
+    text-align:center;margin:4px 0 6px;font-size:26px;color:var(--plum);
+    font-family:"Unbounded",-apple-system,sans-serif;font-weight:900;letter-spacing:.01em;
+  }
+  .section-sub{text-align:center;margin:0 0 26px;color:var(--muted);font-weight:600}
+  .count-badge{color:var(--sakura-deep)}
+
+  /* ---- detail modal ---- */
+  .modal-overlay{
+    position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:20px;
+    background:rgba(30,40,38,.55);backdrop-filter:blur(5px);
+    animation:fadeIn .2s ease;
+  }
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .modal-card{
+    position:relative;width:min(420px,92vw);border-radius:26px;overflow:hidden;
+    background:var(--panel);border:1px solid var(--panel-border);
+    box-shadow:0 30px 70px -20px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.4);
+    animation:pop .45s cubic-bezier(.2,1.4,.4,1);
+  }
+  .modal-card.golden{border-color:var(--c-gold);box-shadow:0 0 0 3px var(--c-gold) inset,0 0 40px rgba(244,196,48,.6),0 30px 70px -20px rgba(0,0,0,.6)}
+  .modal-close{
+    position:absolute;top:12px;right:12px;z-index:2;width:36px;height:36px;border:none;cursor:pointer;
+    border-radius:50%;background:rgba(255,255,255,.85);color:var(--ink);font-size:16px;font-weight:800;
+    box-shadow:0 4px 10px rgba(0,0,0,.2);transition:transform .15s ease}
+  .modal-close:hover{transform:scale(1.1)}
+  .modal-art{width:100%;aspect-ratio:1;background:linear-gradient(160deg,var(--c-pink-pale),var(--c-green-pale))}
+  .modal-info{padding:20px 24px 26px;text-align:center}
+  .modal-rarity{font-size:12px;font-weight:800;letter-spacing:.22em;text-transform:uppercase}
+  .modal-name{margin:4px 0 0;font-size:26px;font-weight:900;color:var(--plum);
+    font-family:"Unbounded",-apple-system,sans-serif}
+  .modal-meta{margin-top:8px;color:var(--muted);font-weight:600;font-size:14px}
+  .modal-quest{margin-top:16px;padding:12px 16px;border-radius:14px;font-size:13px;line-height:1.5;color:var(--c-gold-text);
+    background:linear-gradient(135deg,rgba(255,243,199,.95),rgba(255,225,150,.95));border:2px solid var(--c-gold)}
+  .modal-quest b{color:var(--c-gold-text)}
+  .slot.owned{cursor:pointer}
+
+  .collection{
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:16px;
+  }
+  .slot{
+    position:relative;aspect-ratio:1;border-radius:20px;overflow:hidden;
+    background:linear-gradient(160deg,#fff,var(--c-pink-pale));
+    border:3px solid #fff;box-shadow:0 10px 24px -14px var(--shadow), 0 0 0 2px rgba(255,157,180,.4) inset;
+    display:flex;align-items:center;justify-content:center;
+    transition:transform .2s ease;
+  }
+  .slot .emoji{font-size:64px}
+  .slot .cap{position:absolute;bottom:0;left:0;right:0;padding:16px 4px 6px;display:flex;flex-direction:column;gap:1px;background:linear-gradient(transparent,rgba(255,255,255,.94) 55%);color:var(--plum);letter-spacing:.03em}
+  .slot .cap b{font-size:11.5px;font-weight:800}
+  .slot .cap i{font-size:9px;font-weight:800;font-style:normal;letter-spacing:.15em;text-transform:uppercase}
+  .slot.locked{filter:none}
+  .slot.locked .emoji,.slot.locked .art-img{filter:grayscale(1) brightness(1.02) blur(1.5px);opacity:.5}
+  .slot.locked .cap b{color:#a98a99}
+  .slot.locked .lock{position:absolute;font-size:30px;opacity:.5}
+  .slot.owned{transform:none}
+  .slot.owned:hover{transform:translateY(-4px) rotate(-1deg)}
+  .slot.owned .badge{position:absolute;top:6px;right:6px;font-size:13px;background:var(--mauve);color:#4a2e63;border-radius:999px;padding:2px 8px;font-weight:900;box-shadow:0 3px 6px rgba(0,0,0,.15)}
+  .just-minted{animation:pop .6s cubic-bezier(.2,1.4,.4,1);box-shadow:0 0 0 4px var(--mauve-deep) inset,0 10px 24px -12px var(--shadow) !important}
+  .slot.golden-slot{border-color:var(--c-gold-light);box-shadow:0 0 0 3px var(--c-gold) inset,0 0 18px 2px rgba(244,196,48,.7),0 10px 24px -12px rgba(120,90,0,.5) !important}
+  .slot.golden-slot .cap b{color:var(--c-gold-text)}
+  .slot.golden-slot::after{content:"👑";position:absolute;top:5px;left:6px;font-size:16px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3))}
+
+  footer{text-align:center;margin-top:50px;color:rgba(255,255,255,.72);font-size:13px}
+  .lang-toggle{display:flex;gap:6px;margin:12px auto 0;width:max-content;padding:4px;border-radius:999px;
+    background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2)}
+  .lang-btn{border:none;cursor:pointer;background:transparent;font-size:18px;line-height:1;
+    padding:4px 8px;border-radius:999px;opacity:.5;transition:opacity .15s ease,background .15s ease}
+  .lang-btn:hover{opacity:.85}
+  .lang-btn.active{opacity:1;background:rgba(255,255,255,.25)}
+
+  /* petals canvas */
+  #petals{position:fixed;inset:0;pointer-events:none;z-index:50}
+</style>
+</head>
+<body>
+<canvas id="petals"></canvas>
+
+<!-- full-page background scene: emerald colour-variations, sparkles & falling petals -->
+<div class="page-scene" aria-hidden="true">
+  <svg class="page-svg" viewBox="0 0 1000 1500" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <filter id="sceneBlur" x="-40%" y="-40%" width="180%" height="180%">
+        <feGaussianBlur stdDeviation="85"/>
+      </filter>
+    </defs>
+    <!-- diffuse colour variations (aurora-like green/teal/mint), across the full height -->
+    <g filter="url(#sceneBlur)">
+      <ellipse cx="500" cy="150" rx="520" ry="260" fill="#7bedc0" opacity="0.32"/>
+      <ellipse cx="200" cy="120" rx="320" ry="220" fill="#49c9c0" opacity="0.24"/>
+      <ellipse cx="820" cy="240" rx="360" ry="240" fill="#a6e79a" opacity="0.20"/>
+      <ellipse cx="640" cy="520" rx="440" ry="260" fill="#5fd6a8" opacity="0.20"/>
+      <ellipse cx="180" cy="600" rx="340" ry="220" fill="#4fb894" opacity="0.18"/>
+      <ellipse cx="800" cy="780" rx="380" ry="240" fill="#7bedc0" opacity="0.16"/>
+      <ellipse cx="360" cy="920" rx="420" ry="250" fill="#49c9c0" opacity="0.16"/>
+      <ellipse cx="720" cy="1120" rx="420" ry="250" fill="#a6e79a" opacity="0.14"/>
+      <ellipse cx="260" cy="1260" rx="380" ry="230" fill="#5fd6a8" opacity="0.16"/>
+      <ellipse cx="640" cy="1420" rx="440" ry="260" fill="#7bedc0" opacity="0.14"/>
+    </g>
+    <g class="sparks" fill="#eafff6">
+      <circle cx="160" cy="90" r="2.5"/><circle cx="470" cy="230" r="2"/><circle cx="720" cy="70" r="2.5"/>
+      <circle cx="900" cy="220" r="2"/><circle cx="300" cy="360" r="2.5"/><circle cx="620" cy="420" r="2"/>
+      <circle cx="850" cy="560" r="2.5"/><circle cx="180" cy="640" r="2"/><circle cx="520" cy="720" r="2"/>
+      <circle cx="760" cy="880" r="2.5"/><circle cx="330" cy="980" r="2"/><circle cx="880" cy="1080" r="2"/>
+      <circle cx="220" cy="1180" r="2.5"/><circle cx="600" cy="1260" r="2"/><circle cx="810" cy="1360" r="2.5"/>
+      <circle cx="400" cy="1440" r="2"/>
+    </g>
+  </svg>
+  <div class="hero-flakes" id="pageFlakes"></div>
+</div>
+
+<header class="brand">
+  <div class="hero-banner">
+    <div class="hero-title">
+      <span class="logo-corgi" role="img" aria-label="Taigaz corgi"><span class="logo-corgi-fill"></span></span>
+      <h1>TAIGAZ</h1>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- Golden Queen quest box (same position on login & mint screens) -->
+  <div class="quest-box" id="questBox"></div>
+
+  <!-- CONNECT SCREEN -->
+  <section id="connect" class="card">
+    <div class="connect-avatar">
+      <img src="collection_assets/placeholder_raw.png" alt="A mysterious Taiga spirit">
+    </div>
+    <h2 data-i18n="welcome_title">Welcome 🌸</h2>
+    <p data-i18n="welcome_desc">Pick a pseudo and create your guest wallet to mint your own Taiga corgi spirit.</p>
+    <input id="nickInput" class="nick-input" type="text" maxlength="18" placeholder="Choose your pseudo…" data-i18n-ph="nick_ph" autocomplete="off">
+    <button class="btn" id="connectBtn" data-i18n="create_wallet">🐾 Create wallet</button>
+  </section>
+
+  <!-- MAIN APP -->
+  <section id="app" class="hidden">
+
+    <div class="card">
+      <div class="topbar">
+        <span class="wallet-pill"><span class="dot"></span><b id="walletName">Guest</b><span class="wallet-addr" id="walletAddr">0x00…corgi</span></span>
+        <span class="wallet-pill" style="border-color:var(--emerald);color:var(--emerald-deep)">🌿 <span data-i18n="owned_label">Owned:</span> <b id="ownedCount">0</b> / <b id="totalCount">0</b></span>
+      </div>
+
+      <div class="mint-grid">
+        <div class="reveal-card" id="revealCard">
+          <div class="taiga-frame" id="frame">
+            <div class="art is-placeholder" id="art">
+              <img class="art-img" src="collection_assets/placeholder_raw.png" alt="Hidden Taiga">
+            </div>
+          </div>
+          <div class="reveal-info">
+            <div class="taiga-rarity hidden" id="taigaRarity"></div>
+            <div class="taiga-name hidden" id="taigaName"></div>
+            <div class="taiga-meta hidden" id="taigaMeta"></div>
+            <div class="status" id="status">A mysterious corgi awaits…</div>
+          </div>
+        </div>
+        <div class="quest-banner hidden" id="questBanner">
+          <div class="quest-title" data-i18n="qbanner_title">👑 Congrats — You found the Golden Queen!! 👑</div>
+          <div class="quest-body" data-i18n="qbanner_body">🗝️ You found the Golden Queen — Taiga can now return to her owners.</div>
+        </div>
+        <div>
+          <button class="btn" id="mintBtn">🌸 Mint a Taiga</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card collection-card">
+      <h2 class="section-title" data-i18n="my_collection">My Collection</h2>
+      <p class="section-sub"><span class="count-badge" id="collSummary">0 discovered</span></p>
+      <div class="collection" id="collection"></div>
+      <div class="save-row">
+        <button class="btn save-btn" id="saveBtn" data-i18n="save_collection">💾 Save my collection</button>
+        <p class="save-note hidden" id="saveNote" data-i18n="save_note">🔒 Coming soon — sign in with your socials (Privy) to save your Taigaz to a permanent account.</p>
+        <div class="market-row">
+          <button class="btn btn-secondary" id="openseaBtn">
+            <svg class="mk-ico" viewBox="0 0 90 90" aria-hidden="true"><circle cx="45" cy="45" r="45" fill="#2081E2"/><path fill="#fff" d="M22.2 46.5l.2-.3 11.9-18.6c.2-.3.6-.2.7.1 2 4.5 3.7 10 2.9 13.5-.4 1.4-1.3 3.4-2.3 5.2a.6.6 0 0 1-.5.3H22.7c-.5 0-.8-.5-.5-.9z"/><path fill="#fff" d="M74.4 51.3v2.9c0 .2-.1.3-.3.4-1 .4-4.2 1.9-5.6 3.7-3.4 4.7-6 11.4-11.8 11.4H33.5c-8.6 0-15.5-7-15.5-15.5v-.3c0-.2.2-.4.4-.4h13.3c.3 0 .5.2.5.5-.1 1 .1 2 .5 2.9.8 1.7 2.6 2.8 4.5 2.8h6.6v-5.1h-6.5c-.3 0-.5-.4-.4-.7.1-.2.2-.4.4-.7 1-1.4 2.4-3.6 3.8-6.1a30.5 30.5 0 0 0 3.7-16.6c-.1-2-.4-4-.9-5.9-.3-1.3.7-2.6 2-2.6h.3c.7 0 1.4.4 1.8 1a35 35 0 0 1 4.7 21.4c-.3 2.8-1 5.6-2.1 8.2h.3c1 0 3.6-.1 4.6-.3.3 0 .6-.2.9-.5.9-1.1 1.6-2.4 2.5-3.6.1-.2.3-.3.6-.3h11.4c.3 0 .6.3.6.6z"/></svg>
+            <span data-i18n="view_opensea">View on OpenSea</span>
+          </button>
+          <button class="btn btn-secondary" id="raribleBtn">
+            <svg class="mk-ico" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#FEDA03"/><path fill="#000" d="M10.5 8.5h7.2c2.8 0 4.4 1.6 4.4 3.9 0 1.6-.9 2.8-2.3 3.4l2.6 5H18.9l-2.2-4.4h-2.6v4.4h-3.6V8.5zm3.6 3.2v2.6h3.3c1 0 1.6-.5 1.6-1.3s-.6-1.3-1.6-1.3h-3.3z"/></svg>
+            <span data-i18n="view_rarible">View on Rarible</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    🐾 Taigaz - Eleonore &amp; Cheun - 15/08/2026 🌸
+    <div class="lang-toggle" id="langToggle">
+      <button class="lang-btn" data-lang="en" title="English" aria-label="English">🇬🇧</button>
+      <button class="lang-btn" data-lang="fr" title="Français" aria-label="Français">🇫🇷</button>
+    </div>
+  </footer>
+</div>
+
+<!-- Taiga detail modal -->
+<div class="modal-overlay hidden" id="modal">
+  <div class="modal-card" id="modalCard">
+    <button class="modal-close" id="modalClose" aria-label="Close">✕</button>
+    <div class="modal-art" id="modalArt"><img class="art-img" id="modalImg" src="" alt=""></div>
+    <div class="modal-info">
+      <div class="modal-rarity" id="modalRarity"></div>
+      <h3 class="modal-name" id="modalName"></h3>
+      <div class="modal-meta" id="modalMeta"></div>
+      <div class="modal-quest hidden" id="modalQuest" data-i18n="qbanner_body">🗝️ You found the Golden Queen — Taiga can now return to her owners.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------------- Taiga catalog ---------------- */
+const IMG = 'nft_output/final_set/';
+const PLACEHOLDER = 'collection_assets/placeholder_raw.png';
+const TAIGAZ = [
+  { id:'01', name:'Golden Queen',    img:IMG+'01_golden_queen.png',    rarity:'Legendary', weight:0.6 },
+  { id:'02', name:'Samurai',         img:IMG+'02_samurai.png',         rarity:'Epic',      weight:2.5 },
+  { id:'03', name:'Martial Art',     img:IMG+'03_martial_art.png',     rarity:'Common',    weight:12 },
+  { id:'04', name:'Cheerleader',     img:IMG+'04_cheerleader.png',     rarity:'Rare',      weight:5 },
+  { id:'05', name:'Baby',            img:IMG+'05_baby.png',            rarity:'Rare',      weight:5 },
+  { id:'06', name:'Books',           img:IMG+'06_books.png',           rarity:'Common',    weight:12 },
+  { id:'07', name:'Bretonne',        img:IMG+'07_bretonne.png',        rarity:'Common',    weight:12 },
+  { id:'08', name:'Lyon',            img:IMG+'08_lyon.png',            rarity:'Common',    weight:12 },
+  { id:'09', name:'Karaoke K-pop',   img:IMG+'09_karaoke_kpop.png',    rarity:'Rare',      weight:5 },
+  { id:'10', name:'Cooking',         img:IMG+'10_cooking.png',         rarity:'Common',    weight:12 },
+  { id:'11', name:'Kimono',          img:IMG+'11_kimono.png',          rarity:'Epic',      weight:2.5 },
+  { id:'12', name:'Hacker',          img:IMG+'12_hacker.png',          rarity:'Rare',      weight:5 },
+  { id:'13', name:'Aviator',         img:IMG+'13_aviator.png',         rarity:'Rare',      weight:5 },
+  { id:'14', name:'Blueprint',       img:IMG+'14_blueprint.png',       rarity:'Rare',      weight:5 },
+  { id:'15', name:'Gaming',          img:IMG+'15_gaming.png',          rarity:'Common',    weight:12 },
+  { id:'16', name:'Ramen',           img:IMG+'16_ramen.png',           rarity:'Common',    weight:12 },
+  { id:'17', name:'Fitness',         img:IMG+'17_fitness.png',         rarity:'Common',    weight:12 },
+];
+/* rarity colours drawn from the standardized palette */
+const RARITY_COLOR = {
+  Common:'#7f938e',      /* muted slate-green */
+  Uncommon:'#2c5954',    /* --c-green */
+  Rare:'#a978cf',        /* --c-mauve-deep */
+  Epic:'#7a5cc6',        /* --c-purple */
+  Legendary:'#c79a3f',   /* --c-gold-deep */
+  Mythic:'#d15b74'       /* deep sakura */
+};
+const RARITY_RANK = { Mythic:0, Legendary:1, Epic:2, Rare:3, Uncommon:4, Common:5 };
+
+/* ---------------- i18n (EN / FR) ---------------- */
+let LANG = 'fr';
+const I18N = {
+  en:{
+    welcome_title:'Welcome 🌸',
+    welcome_desc:'Pick a pseudo and create your guest wallet to mint your own Taigaz',
+    nick_ph:'Choose your pseudo…',
+    create_wallet:'🐾 Create wallet',
+    owned_label:'Owned:',
+    my_collection:'My Collection',
+    discovered:'{0} / {1} discovered',
+    save_collection:'💾 Save my collection',
+    save_note:'🔒 Coming soon — sign in with your socials (Privy) to save your Taigaz to a permanent account.',
+    view_opensea:'View on OpenSea',
+    view_rarible:'View on Rarible',
+    await:'A mysterious corgi awaits…',
+    mint_cta:'🌸 Mint a Taigaz',
+    mint_another:'🌸 Mint another',
+    minting:'⛓️ Minting…',
+    confirming:'Confirming on-chain',
+    minted_ok:'✨ Minted! Welcome home, little one.',
+    golden_status:'👑 Congrats — You found the Golden Queen!!',
+    cooldown:'⏳ Mint again in {0}s',
+    qbanner_title:'👑 Congrats — You found the Golden Queen!! 👑',
+    qbanner_body:'🗝️ You found the Golden Queen — Taiga can now return to her owners.',
+    quest_find_l1:'🌸 Collect all 17 Taigaz!',
+    quest_find_a:'Good luck finding the',
+    quest_find_b:'Golden Queen Taiga 🍀',
+    quest_found_title:'👑 The Golden Queen has been captured!',
+    quest_found_congrats:'Congrats {0} 🎉 — tap her to take a look.',
+    modal_meta:'Taigaz #{0}',
+    copy_one:'copy', copy_many:'copies',
+    rarity:{Common:'Common',Uncommon:'Uncommon',Rare:'Rare',Epic:'Epic',Legendary:'Legendary',Mythic:'Mythic'}
+  },
+  fr:{
+    welcome_title:'Bienvenue 🌸',
+    welcome_desc:'Choisis un pseudo et crée ton album pour découvrir tes Taigaz',
+    nick_ph:'Choisis ton pseudo…',
+    create_wallet:'🐾 Créer mon album',
+    owned_label:'Collectionnées :',
+    my_collection:'Ma Collection',
+    discovered:'{0} / {1} Taigaz découvertes',
+    save_collection:'💾 Sauvegarder ma collection',
+    save_note:'🔒 Bientôt — connecte-toi avec tes réseaux (Privy) pour sauvegarder tes Taigaz sur un compte permanent.',
+    view_opensea:'Voir sur OpenSea',
+    view_rarible:'Voir sur Rarible',
+    await:'Un corgi mystérieux t\'attend…',
+    mint_cta:'🌸 Révéler une Taigaz',
+    mint_another:'🌸 Découvrir une autre',
+    minting:'⛓️ Révélation en cours…',
+    confirming:'Confirmation on-chain',
+    minted_ok:'✨ Révélée ! Bienvenue à la maison, petite.',
+    golden_status:'👑 Bravo — tu as trouvé la Golden Queen !!',
+    cooldown:'⏳ Redécouvrir dans {0}s',
+    qbanner_title:'👑 Bravo — tu as trouvé la Golden Queen !! 👑',
+    qbanner_body:'🗝️ Tu as trouvé la Golden Queen — Taiga peut enfin retourner chez ses propriétaires.',
+    quest_find_l1:'🌸 Collectionne les 17 Taigaz !',
+    quest_find_a:'Bonne chance pour retrouver la',
+    quest_find_b:'Golden Queen Taiga 🍀',
+    quest_found_title:'👑 La Golden Queen a été capturée !',
+    quest_found_congrats:'Bravo {0} 🎉',
+    modal_meta:'Taigaz #{0}',
+    copy_one:'exemplaire', copy_many:'exemplaires',
+    rarity:{Common:'Commune',Uncommon:'Peu commune',Rare:'Rare',Epic:'Épique',Legendary:'Légendaire',Mythic:'Mythique'}
+  }
+};
+function t(key, ...args){
+  let s = (I18N[LANG] && I18N[LANG][key]) ?? (I18N.en[key] ?? key);
+  args.forEach((a,i)=>{ s = s.replace('{'+i+'}', a); });
+  return s;
+}
+function tRarity(r){ return (I18N[LANG].rarity[r] || r); }
+
+/* ---------------- Store (in-memory JS store) ---------------- */
+const store = {
+  connected:false,
+  pseudo:'Guest',
+  address:'0x00…corgi',
+  goldenFinder:null,      // pseudo of whoever first minted the Golden Queen
+  owned:{}, // id -> count
+  add(id){ this.owned[id] = (this.owned[id]||0)+1; },
+  has(id){ return !!this.owned[id]; },
+  distinct(){ return Object.keys(this.owned).length; },
+};
+
+/* ---------------- Elements ---------------- */
+const $ = s => document.querySelector(s);
+const connectScreen = $('#connect');
+const app = $('#app');
+const mintBtn = $('#mintBtn');
+const revealCard = $('#revealCard');
+const frame = $('#frame');
+const art = $('#art');
+const statusEl = $('#status');
+const nameEl = $('#taigaName');
+const rarityEl = $('#taigaRarity');
+const metaEl = $('#taigaMeta');
+const questBanner = $('#questBanner');
+const collectionEl = $('#collection');
+
+/* ---------------- Detail modal ---------------- */
+const modal = $('#modal');
+function openModal(id){
+  const item = TAIGAZ.find(x=>x.id===id);
+  if(!item || !store.has(id)) return;
+  const count = store.owned[id] || 0;
+  const golden = id==='01';
+  $('#modalImg').src = item.img;
+  $('#modalImg').alt = item.name;
+  $('#modalName').textContent = item.name;
+  $('#modalRarity').textContent = tRarity(item.rarity);
+  $('#modalRarity').style.color = RARITY_COLOR[item.rarity];
+  $('#modalMeta').innerHTML = t('modal_meta', item.id);
+  $('#modalQuest').classList.toggle('hidden', !golden);
+  $('#modalCard').classList.toggle('golden', golden);
+  modal.classList.remove('hidden');
+}
+function closeModal(){ modal.classList.add('hidden'); }
+collectionEl.addEventListener('click', e => {
+  const slot = e.target.closest('.slot.owned');
+  if(slot) openModal(slot.id.replace('slot-',''));
+});
+$('#modalClose').addEventListener('click', closeModal);
+modal.addEventListener('click', e => { if(e.target===modal) closeModal(); });
+addEventListener('keydown', e => { if(e.key==='Escape') closeModal(); });
+
+/* ---------------- Banner: falling petals & leaves ---------------- */
+(function seedFlakes(){
+  const host = document.getElementById('pageFlakes');
+  if(!host) return;
+  const N = 46;
+  for(let i=0;i<N;i++){
+    const f = document.createElement('span');
+    const leaf = Math.random() < 0.16;
+    f.className = 'flake ' + (leaf ? 'leaf' : 'petal');
+    const dur = 9 + Math.random()*9;          // 9–18s (full-page fall)
+    f.style.left = (Math.random()*100) + '%';
+    f.style.animationDuration = dur + 's';
+    f.style.animationDelay = (-Math.random()*dur) + 's';
+    f.style.setProperty('--drift', (Math.random()*120 - 60).toFixed(0) + 'px');
+    f.style.setProperty('--s', (0.7 + Math.random()*0.9).toFixed(2));
+    host.appendChild(f);
+  }
+})();
+
+/* ---------------- Connect (create guest wallet) ---------------- */
+$('#connectBtn').addEventListener('click', () => {
+  const nick = ($('#nickInput').value || '').trim().slice(0,18);
+  store.pseudo = nick || 'Guest';
+  store.connected = true;
+  const rnd = Math.random().toString(16).slice(2,6);
+  store.address = '0x' + rnd + '…corgi';
+  $('#walletName').textContent = store.pseudo;
+  $('#walletAddr').textContent = store.address;
+  connectScreen.classList.add('hidden');
+  app.classList.remove('hidden');
+  renderCollection();
+  updateCounts();
+  updateQuestBox();
+  burstPetals(30);
+});
+
+/* ---------------- Golden Queen quest box (top) ---------------- */
+const questBox = $('#questBox');
+function updateQuestBox(){
+  if(store.has('01')){
+    const queen = TAIGAZ[0];
+    questBox.className = 'quest-box found';
+    questBox.innerHTML =
+      '<img class="quest-queen" src="'+queen.img+'" alt="Golden Queen" data-open="01">' +
+      '<div class="quest-text">' +
+        '<div class="quest-line1">'+ t('quest_found_title') +'</div>' +
+        '<div class="quest-line2">'+ t('quest_found_congrats', '<b>'+(store.goldenFinder||store.pseudo)+'</b>') +'</div>' +
+      '</div>';
+  } else {
+    questBox.className = 'quest-box';
+    questBox.innerHTML =
+      '<div class="quest-find-l1">'+ t('quest_find_l1') +'</div>' +
+      '<div class="quest-find-l2"><span style="color:var(--c-green)">'+ t('quest_find_a') +'</span> <span style="color:var(--c-gold-deep);white-space:nowrap">'+ t('quest_find_b') +'</span></div>';
+  }
+}
+questBox.addEventListener('click', e => {
+  const el = e.target.closest('[data-open]');
+  if(el) openModal(el.dataset.open);
+});
+updateQuestBox();   // show the "find the golden queen" hint from the start (login screen)
+
+/* ---------------- Save collection (Privy social login — coming soon) ---------------- */
+$('#saveBtn').addEventListener('click', () => {
+  // TODO: connect to Privy social login to persist the guest collection to an account
+  $('#saveNote').classList.remove('hidden');
+});
+
+/* ---------------- Marketplace links (placeholder for v1) ---------------- */
+// TODO: point these at the real Taigaz collection pages once deployed on-chain
+$('#openseaBtn').addEventListener('click', () => window.open('https://opensea.io', '_blank', 'noopener'));
+$('#raribleBtn').addEventListener('click', () => window.open('https://rarible.com', '_blank', 'noopener'));
+
+/* ---------------- Collection grid ----------------
+   Sorted: owned first, then by rarity (rarest first). */
+function sortedTaigaz(){
+  return [...TAIGAZ].sort((a,b)=>{
+    const oa = store.has(a.id)?0:1, ob = store.has(b.id)?0:1;
+    if(oa!==ob) return oa-ob;                                   // owned before locked
+    if(RARITY_RANK[a.rarity]!==RARITY_RANK[b.rarity])
+      return RARITY_RANK[a.rarity]-RARITY_RANK[b.rarity];       // rarest first
+    return a.id.localeCompare(b.id);                            // stable tiebreak
+  });
+}
+
+function renderCollection(justMintedId){
+  collectionEl.innerHTML = '';
+  sortedTaigaz().forEach(t => {
+    const count = store.owned[t.id] || 0;
+    const owned = count > 0;
+    const slot = document.createElement('div');
+    slot.id = 'slot-' + t.id;
+    if(owned){
+      slot.className = 'slot owned' + (t.id==='01' ? ' golden-slot' : '') + (t.id===justMintedId ? ' just-minted' : '');
+      slot.innerHTML = `
+        <img class="art-img" src="${t.img}" alt="${t.name}" draggable="false">
+        ${count>1 ? `<span class="badge">×${count}</span>` : ''}
+        <span class="cap"><b>${t.name}</b><i style="color:${RARITY_COLOR[t.rarity]}">${tRarity(t.rarity)}</i></span>`;
+    } else {
+      slot.className = 'slot locked';
+      slot.innerHTML = `
+        <img class="art-img" src="${PLACEHOLDER}" alt="" draggable="false">
+        <span class="lock">🔒</span>
+        <span class="cap"><b>${t.name}</b><i style="color:${RARITY_COLOR[t.rarity]}">${tRarity(t.rarity)}</i></span>`;
+    }
+    collectionEl.appendChild(slot);
+  });
+  $('#totalCount').textContent = TAIGAZ.length;
+}
+
+function updateCounts(){
+  $('#ownedCount').textContent = store.distinct();
+  $('#collSummary').textContent = t('discovered', store.distinct(), TAIGAZ.length);
+}
+
+/* ---------------- Weighted random pick ---------------- */
+let mintNo = 0;
+function pickTaiga(){
+  mintNo++;
+  if(mintNo === 5) return TAIGAZ[0];              // the 5th mint is always the Golden Queen
+  const pool = TAIGAZ.filter(t => t.id !== '01'); // otherwise never the Golden Queen
+  const total = pool.reduce((s,t)=>s+t.weight,0);
+  let r = Math.random()*total;
+  for(const t of pool){ if((r-=t.weight)<=0) return t; }
+  return pool[0];
+}
+
+/* ---------------- Mint flow (3s fake blockchain delay) ---------------- */
+let minting = false;
+mintBtn.addEventListener('click', () => {
+  if(minting) return;
+  minting = true;
+  mintBtn.disabled = true;
+  mintBtn.textContent = t('minting');
+
+  // reset frame to hidden/loading state
+  nameEl.classList.add('hidden');
+  rarityEl.classList.add('hidden');
+  metaEl.classList.add('hidden');
+  statusEl.style.display = '';
+  questBanner.classList.add('hidden');
+  revealCard.classList.remove('golden');
+  revealCard.classList.remove('revealed');
+  art.className = 'art summoning';
+  art.innerHTML = `<img class="art-img" src="${PLACEHOLDER}" alt="Summoning…">`;
+  const spin = document.createElement('div');
+  spin.className = 'spinner';
+  frame.appendChild(spin);
+
+  let dots = 0;
+  statusEl.textContent = t('confirming');
+  const tick = setInterval(()=>{ dots=(dots+1)%4; statusEl.textContent=t('confirming')+'.'.repeat(dots); }, 350);
+
+  // 3 second blockchain delay
+  setTimeout(() => {
+    clearInterval(tick);
+    spin.remove();
+    const chosen = pickTaiga();
+    store.add(chosen.id);
+
+    // reveal
+    art.className = 'art reveal-pop';
+    revealCard.classList.add('revealed');
+    art.style.background = 'radial-gradient(circle,'+ (RARITY_COLOR[chosen.rarity]) +'33, #fff)';
+    art.innerHTML = `<img class="art-img" src="${chosen.img}" alt="${chosen.name}" draggable="false">`;
+
+    nameEl.textContent = chosen.name;
+    nameEl.classList.remove('hidden');
+    rarityEl.textContent = tRarity(chosen.rarity);
+    rarityEl.style.color = RARITY_COLOR[chosen.rarity];
+    rarityEl.classList.remove('hidden');
+    metaEl.textContent = t('modal_meta', chosen.id);
+    metaEl.classList.remove('hidden');
+    // same layout as the detail modal — no status line on reveal
+    statusEl.textContent = '';
+    statusEl.style.display = 'none';
+
+    const isGolden = chosen.id === '01';
+    if(isGolden && !store.goldenFinder) store.goldenFinder = store.pseudo;
+    revealCard.classList.toggle('golden', isGolden);
+    questBanner.classList.toggle('hidden', !isGolden);
+
+    renderCollection(chosen.id);
+    updateCounts();
+    updateQuestBox();
+    isGolden ? celebrateGolden() : celebrate();
+
+    minting = false;
+    startCooldown(10);
+  }, 3000);
+});
+
+/* keep the mint button locked with a countdown after a successful mint */
+let cooldownTimer = null;
+function startCooldown(seconds){
+  clearInterval(cooldownTimer);
+  let left = seconds;
+  mintBtn.disabled = true;
+  const tick = () => { mintBtn.textContent = t('cooldown', left); };
+  tick();
+  cooldownTimer = setInterval(() => {
+    left--;
+    if(left <= 0){
+      clearInterval(cooldownTimer);
+      mintBtn.disabled = false;
+      mintBtn.textContent = t('mint_another');
+    } else {
+      tick();
+    }
+  }, 1000);
+}
+
+/* ---------------- Cherry blossom petal confetti ---------------- */
+const canvas = $('#petals');
+const ctx = canvas.getContext('2d');
+let petals = [];
+function resize(){ canvas.width=innerWidth; canvas.height=innerHeight; }
+resize(); addEventListener('resize', resize);
+
+function makePetal(x,y,burst,emoji){
+  /* cherry-blossom petals — palette pinks, mauves & light green */
+  const colors=['#eab8b9','#d1b3e6','#d1e7d7','#d98a97','#a978cf','#f6e2e3'];
+  return {
+    x, y,
+    r: emoji ? 14+Math.random()*12 : 6+Math.random()*8,
+    color: colors[Math.floor(Math.random()*colors.length)],
+    emoji: emoji || null,
+    vx: (Math.random()-0.5)* (burst?7:1.2),
+    vy: burst ? -(3+Math.random()*6) : (1+Math.random()*2),
+    rot: Math.random()*Math.PI*2,
+    vr: (Math.random()-0.5)*0.2,
+    sway: Math.random()*2,
+    life: 1,
+    burst: !!burst,
+  };
+}
+function burstPetals(n){
+  for(let i=0;i<n;i++) petals.push(makePetal(innerWidth/2, innerHeight*0.35, true));
+}
+function celebrate(){
+  // big burst from center + a rain
+  for(let i=0;i<90;i++) petals.push(makePetal(innerWidth/2, innerHeight*0.4, true));
+  let rained=0;
+  const rain=setInterval(()=>{
+    for(let i=0;i<4;i++) petals.push(makePetal(Math.random()*innerWidth, -20, false));
+    if(++rained>40) clearInterval(rain);
+  },80);
+}
+function celebrateGolden(){
+  // a few crowns + petals — kept light so it stays smooth
+  const crowns=['👑','✨'];
+  for(let i=0;i<45;i++) petals.push(makePetal(innerWidth/2, innerHeight*0.4, true));
+  for(let i=0;i<8;i++)  petals.push(makePetal(innerWidth/2, innerHeight*0.4, true, crowns[i%crowns.length]));
+  let n=0;
+  const rain=setInterval(()=>{
+    if(n%2===0) petals.push(makePetal(Math.random()*innerWidth, -20, false, Math.random()<0.5?'👑':'✨'));
+    for(let i=0;i<2;i++) petals.push(makePetal(Math.random()*innerWidth, -20, false));
+    if(++n>24) clearInterval(rain);
+  },90);
+}
+function drawPetal(p){
+  ctx.save();
+  ctx.translate(p.x,p.y);
+  ctx.rotate(p.rot);
+  ctx.globalAlpha = Math.max(0,Math.min(1,p.life));
+  if(p.emoji){
+    ctx.font = (p.r*2)+'px serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(p.emoji,0,0);
+    ctx.restore();
+    return;
+  }
+  ctx.fillStyle = p.color;
+  // petal shape
+  ctx.beginPath();
+  ctx.moveTo(0,-p.r);
+  ctx.bezierCurveTo(p.r*0.9,-p.r*0.6, p.r*0.6,p.r*0.6, 0,p.r);
+  ctx.bezierCurveTo(-p.r*0.6,p.r*0.6, -p.r*0.9,-p.r*0.6, 0,-p.r);
+  ctx.fill();
+  ctx.restore();
+}
+function loop(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  petals.forEach(p=>{
+    p.vy += p.burst ? 0.16 : 0.0; // gravity on bursts
+    p.x += p.vx + Math.sin((p.y+p.sway*40)/40)*0.6;
+    p.y += p.vy;
+    p.rot += p.vr;
+    if(p.burst && p.vy>0) p.life -= 0.006;
+    drawPetal(p);
+  });
+  petals = petals.filter(p => p.life>0 && p.y < canvas.height+30);
+  requestAnimationFrame(loop);
+}
+loop();
+
+/* ---------------- Language toggle (EN / FR) ---------------- */
+function applyLang(lang){
+  LANG = (lang === 'fr') ? 'fr' : 'en';
+  document.documentElement.lang = LANG;
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+  updateQuestBox();
+  if(store.connected){ updateCounts(); renderCollection(); }
+  if(!minting && !mintBtn.disabled){
+    mintBtn.textContent = store.distinct() ? t('mint_another') : t('mint_cta');
+  }
+  if(!minting && store.distinct() === 0){ statusEl.textContent = t('await'); }
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === LANG));
+}
+$('#langToggle').addEventListener('click', e => {
+  const b = e.target.closest('.lang-btn');
+  if(b) applyLang(b.dataset.lang);
+});
+applyLang('fr');
+</script>
+</body>
+</html>

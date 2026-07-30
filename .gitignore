@@ -1,0 +1,36 @@
+# ── Secrets — never commit ──────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── OS / editor ─────────────────────────────────────────────────────────────
+.DS_Store
+*.swp
+*~
+
+# ── Claude Code local state ─────────────────────────────────────────────────
+.claude/
+
+# ── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ── Node / build ────────────────────────────────────────────────────────────
+node_modules/
+dist/
+*.tsbuildinfo
+
+# ── Foundry (contracts) ─────────────────────────────────────────────────────
+contracts/cache/
+contracts/out/
+contracts/broadcast/**/dry-run/
+# Vendored deps — restore with: forge install (see contracts/README.md)
+contracts/lib/
+
+# ── NFT working artifacts (keep only nft/nft_output/final_set/) ──────────────
+/nft/nft_output/*.png
+/nft/nft_output/_*
+nft/style_anchor/lab*/
+nft/style_anchor/anchor_v*.png
