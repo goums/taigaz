@@ -19,6 +19,10 @@ export function initPetals(canvas: HTMLCanvasElement): PetalController {
   const ctx = canvas.getContext("2d")!;
   let petals: Petal[] = [];
   let raf = 0;
+  let running = false;
+  // Lighter confetti on phones (fewer particles to draw per frame).
+  const M = () => (window.innerWidth < 640 ? 0.5 : 1);
+  const N = (n: number) => Math.max(1, Math.round(n * M()));
 
   const resize = () => {
     canvas.width = window.innerWidth;
@@ -42,24 +46,29 @@ export function initPetals(canvas: HTMLCanvasElement): PetalController {
   });
 
   const burst = (n: number) => {
-    for (let i = 0; i < n; i++) petals.push(makePetal(innerWidth / 2, innerHeight * 0.35, true));
+    for (let i = 0; i < N(n); i++) petals.push(makePetal(innerWidth / 2, innerHeight * 0.35, true));
+    start();
   };
   const celebrate = () => {
-    for (let i = 0; i < 90; i++) petals.push(makePetal(innerWidth / 2, innerHeight * 0.4, true));
+    for (let i = 0; i < N(90); i++) petals.push(makePetal(innerWidth / 2, innerHeight * 0.4, true));
+    start();
     let rained = 0;
     const rain = setInterval(() => {
-      for (let i = 0; i < 4; i++) petals.push(makePetal(Math.random() * innerWidth, -20, false));
+      for (let i = 0; i < N(4); i++) petals.push(makePetal(Math.random() * innerWidth, -20, false));
+      start();
       if (++rained > 40) clearInterval(rain);
     }, 80);
   };
   const celebrateGolden = () => {
     const crowns = ["👑", "✨"];
-    for (let i = 0; i < 45; i++) petals.push(makePetal(innerWidth / 2, innerHeight * 0.4, true));
-    for (let i = 0; i < 8; i++) petals.push(makePetal(innerWidth / 2, innerHeight * 0.4, true, crowns[i % 2]));
+    for (let i = 0; i < N(45); i++) petals.push(makePetal(innerWidth / 2, innerHeight * 0.4, true));
+    for (let i = 0; i < N(8); i++) petals.push(makePetal(innerWidth / 2, innerHeight * 0.4, true, crowns[i % 2]));
+    start();
     let n = 0;
     const rain = setInterval(() => {
       if (n % 2 === 0) petals.push(makePetal(Math.random() * innerWidth, -20, false, Math.random() < 0.5 ? "👑" : "✨"));
-      for (let i = 0; i < 2; i++) petals.push(makePetal(Math.random() * innerWidth, -20, false));
+      for (let i = 0; i < N(2); i++) petals.push(makePetal(Math.random() * innerWidth, -20, false));
+      start();
       if (++n > 24) clearInterval(rain);
     }, 90);
   };
@@ -97,9 +106,11 @@ export function initPetals(canvas: HTMLCanvasElement): PetalController {
       drawPetal(p);
     });
     petals = petals.filter((p) => p.life > 0 && p.y < canvas.height + 30);
+    // Idle when there's nothing to draw — no permanent rAF/clearRect churn.
+    if (petals.length === 0) { running = false; ctx.clearRect(0, 0, canvas.width, canvas.height); return; }
     raf = requestAnimationFrame(loop);
   };
-  loop();
+  const start = () => { if (!running) { running = true; raf = requestAnimationFrame(loop); } };
 
   return {
     burst,

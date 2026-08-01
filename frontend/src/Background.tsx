@@ -4,7 +4,10 @@ import { useMemo } from "react";
 // ported from the design mockup.
 export default function Background() {
   const flakes = useMemo(() => {
-    return Array.from({ length: 46 }, () => {
+    // Fewer animated flakes on phones — 46 continuously-animating layers was
+    // janky on mobile.
+    const count = typeof window !== "undefined" && window.innerWidth < 640 ? 14 : 34;
+    return Array.from({ length: count }, () => {
       const leaf = Math.random() < 0.16;
       const dur = 9 + Math.random() * 9;
       return {

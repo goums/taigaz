@@ -125,6 +125,9 @@ export default function App() {
   const saved = authenticated && !isGuest;
   const shortAddr = smartAddress ? `${smartAddress.slice(0, 6)}…${smartAddress.slice(-4)}` : "0x…";
   const midAddr = smartAddress ? `${smartAddress.slice(0, 10)}…${smartAddress.slice(-8)}` : "0x…";
+  // Whether the connected wallet is the one that actually found the Golden Queen.
+  const iAmFinder = !!smartAddress && state.golden.found &&
+    state.golden.finder.toLowerCase() === smartAddress.toLowerCase();
 
   // Human label for the linked account, shown next to "Collection enregistrée".
   const linkedLabel = useMemo(() => {
@@ -336,8 +339,20 @@ export default function App() {
       );
 
       if (mockId) {
+        const item = itemById(mockId)!;
         const isGolden = mockId === GOLDEN_MOCK_ID;
-        setReveal({ item: itemById(mockId)!, golden: isGolden, tokenId });
+        // Preload the reveal art so switching from the placeholder is instant.
+        // Otherwise the reused <img> keeps showing the old placeholder (now at
+        // full opacity, since the is-placeholder class is gone) for a blink
+        // while the new src loads.
+        await new Promise<void>((res) => {
+          const im = new Image();
+          im.onload = () => res();
+          im.onerror = () => res();
+          im.src = item.img;
+          setTimeout(res, 1500); // don't hang the reveal if the image stalls
+        });
+        setReveal({ item, golden: isGolden, tokenId });
         setJustMinted(mockId);
         if (tokenId) {
           setTokenMap((pm) => { const nx = { ...pm, [mockId!]: tokenId }; saveTokenMap(smartAddress, nx); return nx; });
@@ -552,11 +567,11 @@ export default function App() {
                 <div className={"reveal-card" + (reveal?.golden ? " golden" : "") + (reveal ? " revealed" : "")}>
                   <div className="taiga-frame">
                     {reveal ? (
-                      <div className="art reveal-pop" style={{ background: `radial-gradient(circle,${RARITY_COLOR[reveal.item.rarity]}33,#fff)` }}>
+                      <div key="art-reveal" className="art reveal-pop" style={{ background: `radial-gradient(circle,${RARITY_COLOR[reveal.item.rarity]}33,#fff)` }}>
                         <img className="art-img" src={reveal.item.img} alt={reveal.item.name} draggable={false} />
                       </div>
                     ) : (
-                      <div className={"art is-placeholder" + (minting ? " summoning" : "")}>
+                      <div key="art-ph" className={"art is-placeholder" + (minting ? " summoning" : "")}>
                         <img className="art-img" src={PLACEHOLDER} alt="Hidden Taiga" />
                         {minting && <div className="spinner" />}
                       </div>
@@ -672,7 +687,11 @@ export default function App() {
               <div className="modal-rarity" style={{ color: RARITY_COLOR[modalItem.rarity] }}>{tRarity(lang, modalItem.rarity)}</div>
               <h3 className="modal-name">{modalItem.name}</h3>
               <div className="modal-meta">{modalTokenId != null ? t("modal_meta", modalTokenId) : modalItem.name}</div>
-              {modalItem.id === GOLDEN_MOCK_ID && <div className="modal-quest">{t("qbanner_body")}</div>}
+              {modalItem.id === GOLDEN_MOCK_ID && (
+                <div className="modal-quest">
+                  {iAmFinder ? t("qbanner_body") : t("golden_found_other", state.golden.pseudo || "?")}
+                </div>
+              )}
             </div>
           </div>
         </div>
