@@ -25,7 +25,7 @@ dist/
 # ── Foundry (contracts) ─────────────────────────────────────────────────────
 contracts/cache/
 contracts/out/
-contracts/broadcast/**/dry-run/
+contracts/broadcast/
 # Vendored deps — restore with: forge install (see contracts/README.md)
 contracts/lib/
 
