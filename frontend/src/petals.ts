@@ -10,6 +10,7 @@ export interface PetalController {
   burst: (n: number) => void;
   celebrate: () => void;
   celebrateGolden: () => void;
+  fadeOut: () => void;
   destroy: () => void;
 }
 
@@ -20,6 +21,7 @@ export function initPetals(canvas: HTMLCanvasElement): PetalController {
   let petals: Petal[] = [];
   let raf = 0;
   let running = false;
+  let fading = false; // when true, every remaining petal fades out quickly
   // Lighter confetti on phones (fewer particles to draw per frame).
   const M = () => (window.innerWidth < 640 ? 0.5 : 1);
   const N = (n: number) => Math.max(1, Math.round(n * M()));
@@ -103,19 +105,23 @@ export function initPetals(canvas: HTMLCanvasElement): PetalController {
       p.y += p.vy;
       p.rot += p.vr;
       if (p.burst && p.vy > 0) p.life -= 0.006;
+      if (fading) p.life -= 0.05; // ~0.3s fade-out when the cooldown ends
       drawPetal(p);
     });
     petals = petals.filter((p) => p.life > 0 && p.y < canvas.height + 30);
     // Idle when there's nothing to draw — no permanent rAF/clearRect churn.
-    if (petals.length === 0) { running = false; ctx.clearRect(0, 0, canvas.width, canvas.height); return; }
+    if (petals.length === 0) { running = false; fading = false; ctx.clearRect(0, 0, canvas.width, canvas.height); return; }
     raf = requestAnimationFrame(loop);
   };
   const start = () => { if (!running) { running = true; raf = requestAnimationFrame(loop); } };
+  // Quickly clear any remaining confetti (called when the mint cooldown ends).
+  const fadeOut = () => { if (petals.length) { fading = true; start(); } };
 
   return {
     burst,
     celebrate,
     celebrateGolden,
+    fadeOut,
     destroy: () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);

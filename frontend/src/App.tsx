@@ -249,6 +249,11 @@ export default function App() {
     return () => clearInterval(id);
   }, [cooldown]);
 
+  // When the cooldown ends, fade out any confetti still on screen.
+  useEffect(() => {
+    if (cooldown === 0) petalsRef.current?.fadeOut();
+  }, [cooldown]);
+
   // Auto-dismiss the success toast.
   useEffect(() => {
     if (!toast) return;

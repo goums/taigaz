@@ -91,15 +91,19 @@
 
   /* falling cherry-blossom petals & leaves */
   .hero-flakes{position:absolute;inset:0;overflow:hidden;pointer-events:none}
-  .flake{position:absolute;top:-8%;will-change:transform,top;animation:fall linear infinite}
+  /* Animate transform (translateY) only — NOT `top` — so the fall runs on the
+     GPU compositor. Animating `top` triggers layout every frame, which the
+     browser drops while the main thread is busy scrolling (the "petals freeze
+     on scroll" bug on mobile). vh units keep the travel viewport-relative. */
+  .flake{position:absolute;top:0;will-change:transform,opacity;animation:fall linear infinite}
   .flake.petal{width:14px;height:14px;border-radius:150% 0 150% 0;
     background:radial-gradient(circle at 32% 28%,#ffe1ea,#eab8b9);box-shadow:0 0 6px rgba(255,220,230,.5)}
   .flake.leaf{width:16px;height:9px;border-radius:0 100% 0 100%;
     background:linear-gradient(120deg,#8fd4a6,#3f8f6a)}
   @keyframes fall{
-    0%{top:-8%;transform:translateX(0) rotate(0) scale(var(--s,1));opacity:0}
+    0%{transform:translate3d(0,-12vh,0) rotate(0deg) scale(var(--s,1));opacity:0}
     12%,88%{opacity:.9}
-    100%{top:108%;transform:translateX(var(--drift,40px)) rotate(360deg) scale(var(--s,1));opacity:0}
+    100%{transform:translate3d(var(--drift,40px),112vh,0) rotate(360deg) scale(var(--s,1));opacity:0}
   }
   .hero-title{position:absolute;inset:0;bottom:24%;display:flex;align-items:center;justify-content:center;gap:min(2.2vw,26px);pointer-events:none}
   .logo-corgi{
