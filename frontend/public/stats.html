@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Taigaz — on-chain stats (read-only example)</title>
+<style>
+  /* intentionally minimal — this is a working reference, not a designed page */
+  body{font-family:ui-monospace,Menlo,Consolas,monospace;max-width:820px;margin:24px auto;padding:0 16px;line-height:1.5;color:#111}
+  h1{font-size:20px} h2{font-size:16px;margin-top:28px;border-bottom:1px solid #ddd;padding-bottom:4px}
+  h3{font-size:14px;margin-bottom:4px}
+  code{background:#f2f2f2;padding:1px 4px;border-radius:3px}
+  pre{background:#f6f6f6;border:1px solid #e2e2e2;border-radius:6px;padding:12px;overflow:auto;font-size:12.5px;white-space:pre}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{border:1px solid #ddd;padding:4px 8px;text-align:left}
+  th{background:#f2f2f2}
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+  .big{font-size:15px;font-weight:bold}
+  .muted{color:#666;font-size:12px}
+  .copy{float:right;font:inherit;font-size:11px;cursor:pointer;border:1px solid #ccc;background:#fff;border-radius:4px;padding:2px 8px}
+  .err{color:#b00}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+  .cell{border:1px solid #ddd;border-radius:6px;padding:8px}
+  .cell.golden{border-color:#c79a3f;background:#fffdf3}
+  .cell img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:5px;display:block;margin-bottom:6px;background:#eee}
+  .cell b{font-size:14px} .cell .d{font-size:12.5px} .cell .t{color:#666;font-size:11.5px}
+</style>
+</head>
+<body>
+
+<h1>Taigaz — on-chain collection stats</h1>
+<p class="muted">
+  Read-only. No wallet, no signing, no dependencies required. Everything below is fetched
+  straight from a Base Sepolia RPC and refreshed on an interval. Copy any block to reuse.
+</p>
+
+<h2>Config</h2>
+<pre id="cfg"></pre>
+
+<h2>Live (auto-refresh every 10s)</h2>
+<div id="summary">loading…</div>
+<div id="holders-line"><span class="big">…</span> holders <span class="muted">(distinct owners)</span></div>
+<table id="table" hidden>
+  <thead><tr><th>#</th><th>Design</th><th>Rarity</th><th class="num">Minted</th></tr></thead>
+  <tbody id="tbody"></tbody>
+</table>
+<p class="muted" id="updated"></p>
+
+<h2>Recently found <span class="muted">(most recent first)</span></h2>
+<div id="recent" class="grid">loading…</div>
+<p class="muted" id="recent-updated"></p>
+
+<h2>1 — Minimal ABI (the read functions)</h2>
+<pre id="out-abi"></pre>
+
+<h2>2 — Fetch with viem (recommended)</h2>
+<p class="muted">One <code>multicall</code> gets everything in a single request.</p>
+<pre id="out-viem"></pre>
+
+<h2>3 — Fetch with raw JSON-RPC (zero dependencies)</h2>
+<p class="muted">This is exactly what powers the "Live" section above.</p>
+<pre id="out-raw"></pre>
+
+<h2>4 — Recently found (Minted event logs)</h2>
+<p class="muted">The public RPC caps <code>eth_getLogs</code> at 2000 blocks, so we page backward in windows. Base includes <code>blockTimestamp</code> in each log — no extra calls needed for "X ago".</p>
+<pre id="out-recent"></pre>
+
+<h2>Notes</h2>
+<ul class="muted">
+  <li><b>designId → design</b>: id <code>d</code> maps to source file <code>d+2</code> (id 0 = Samurai … id 15 = Fitness). The Golden Queen is separate (not in <code>mintedCounts</code>); use <code>goldenMintedCount()</code>.</li>
+  <li><code>totalMints</code> = pool mints + goldens. So <code>sum(mintedCounts) + goldenMintedCount === totalMints</code>.</li>
+  <li>Swap <code>RPC</code> for your own endpoint (Alchemy/Infura) if the public one rate-limits.</li>
+  <li>Other useful reads: <code>mintedOf(uint256)</code>, <code>goldenFinder()</code>, <code>goldenFoundAt()</code>, <code>isMintOpen()</code>, <code>mintEnd()</code>.</li>
+</ul>
+
+<!-- ==== code sources (verbatim, not executed) ==================================== -->
+<script type="text/plain" id="src-abi">
+[
+  { "type": "function", "name": "totalMints",        "stateMutability": "view", "inputs": [],                                          "outputs": [{ "type": "uint256" }] },
+  { "type": "function", "name": "goldenMintedCount", "stateMutability": "view", "inputs": [],                                          "outputs": [{ "type": "uint256" }] },
+  { "type": "function", "name": "mintedCounts",      "stateMutability": "view", "inputs": [],                                          "outputs": [{ "type": "uint256[]" }] },
+  { "type": "function", "name": "mintedOf",          "stateMutability": "view", "inputs": [{ "name": "designId", "type": "uint256" }], "outputs": [{ "type": "uint256" }] },
+  { "type": "function", "name": "holders",           "stateMutability": "view", "inputs": [],                                          "outputs": [{ "type": "uint256" }] },
+  { "type": "function", "name": "goldenFound",       "stateMutability": "view", "inputs": [],                                          "outputs": [{ "type": "bool" }] },
+  { "type": "function", "name": "goldenFinderPseudo","stateMutability": "view", "inputs": [],                                          "outputs": [{ "type": "string" }] }
+]
+</script>
+
+<script type="text/plain" id="src-viem">
+// npm i viem   (or import from a CDN as below)
+import { createPublicClient, http } from "https://esm.sh/viem@2";
+import { baseSepolia } from "https://esm.sh/viem@2/chains";
+
+const CONTRACT = "0x0ad38ee0e296ac688662b0e788f1dbb9bb295d89";
+const abi = [
+  { type: "function", name: "totalMints",         stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "goldenMintedCount",  stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "mintedCounts",       stateMutability: "view", inputs: [], outputs: [{ type: "uint256[]" }] },
+  { type: "function", name: "holders",            stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "goldenFound",        stateMutability: "view", inputs: [], outputs: [{ type: "bool" }] },
+  { type: "function", name: "goldenFinderPseudo", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
+];
+
+const client = createPublicClient({ chain: baseSepolia, transport: http("https://sepolia.base.org") });
+
+async function fetchStats() {
+  const [total, goldens, counts, holders, found, finder] = await client.multicall({
+    allowFailure: false,
+    contracts: [
+      { address: CONTRACT, abi, functionName: "totalMints" },
+      { address: CONTRACT, abi, functionName: "goldenMintedCount" },
+      { address: CONTRACT, abi, functionName: "mintedCounts" },
+      { address: CONTRACT, abi, functionName: "holders" },
+      { address: CONTRACT, abi, functionName: "goldenFound" },
+      { address: CONTRACT, abi, functionName: "goldenFinderPseudo" },
+    ],
+  });
+  return {
+    totalMinted:   Number(total),
+    goldensMinted: Number(goldens),
+    perDesign:     counts.map(Number), // perDesign[d] = global mints of design d
+    holders:       Number(holders),    // distinct owners (exact, transfer-aware)
+    goldenFound:   found,
+    goldenFinder:  finder,
+  };
+}
+
+// refresh loop
+fetchStats().then(console.log);
+setInterval(() => fetchStats().then(console.log), 10_000);
+</script>
+
+<script type="text/plain" id="src-raw">
+// No libraries. Plain fetch + eth_call + hand-decoding the ABI return data.
+const RPC      = "https://sepolia.base.org";
+const CONTRACT = "0x0ad38ee0e296ac688662b0e788f1dbb9bb295d89";
+
+// 4-byte function selectors (keccak256(signature)[:4])
+const SEL = {
+  totalMints:         "0x1f21bfbf",
+  goldenMintedCount:  "0x0b56ea11",
+  mintedCounts:       "0x45bf75aa",
+  holders:            "0x8188f71c", // distinct owners (exact, transfer-aware)
+  goldenFound:        "0x1323b455",
+  goldenFinderPseudo: "0x4ca83989",
+};
+
+async function ethCall(data) {
+  const r = await fetch(RPC, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call", params: [{ to: CONTRACT, data }, "latest"] }),
+  });
+  const j = await r.json();
+  if (j.error) throw new Error(j.error.message);
+  return j.result; // 0x-prefixed hex
+}
+
+// read the i-th 32-byte word of an ABI-encoded return value
+const word = (hex, i) => BigInt("0x" + hex.slice(2 + i * 64, 2 + i * 64 + 64));
+
+// decode a dynamic uint256[]: [word0 = offset][word1 = length][elements...]
+function decodeUintArray(hex) {
+  const len = Number(word(hex, 1));
+  return Array.from({ length: len }, (_, i) => Number(word(hex, 2 + i)));
+}
+
+// decode a dynamic string: [offset][length][utf8 bytes]
+function decodeString(hex) {
+  const len = Number(word(hex, 1));
+  if (len === 0) return "";
+  const bytes = hex.slice(2 + 2 * 64, 2 + 2 * 64 + len * 2);
+  return new TextDecoder().decode(Uint8Array.from(bytes.match(/../g).map((b) => parseInt(b, 16))));
+}
+
+async function fetchStats() {
+  const [total, goldens, counts, holders, found, finder] = await Promise.all([
+    ethCall(SEL.totalMints),
+    ethCall(SEL.goldenMintedCount),
+    ethCall(SEL.mintedCounts),
+    ethCall(SEL.holders),
+    ethCall(SEL.goldenFound),
+    ethCall(SEL.goldenFinderPseudo),
+  ]);
+  return {
+    totalMinted:   Number(word(total, 0)),
+    goldensMinted: Number(word(goldens, 0)),
+    holders:       Number(word(holders, 0)), // distinct owners (exact, transfer-aware)
+    perDesign:     decodeUintArray(counts),   // perDesign[d] = global mints of design d
+    goldenFound:   word(found, 0) === 1n,
+    goldenFinder:  decodeString(finder),
+  };
+}
+
+fetchStats().then(console.log);
+setInterval(() => fetchStats().then(console.log), 10_000);
+</script>
+
+<script type="text/plain" id="src-recent">
+// Recently minted Taigaz, most recent first, with token id + "X ago".
+// Minted(address indexed to, uint256 indexed tokenId, uint256 designId)
+const RPC      = "https://sepolia.base.org";
+const CONTRACT = "0x0ad38ee0e296ac688662b0e788f1dbb9bb295d89";
+const MINTED   = "0x25b428dfde728ccfaddad7e29e4ac23c24ed7fd1a6e3e3f91894a9a073f5dfff"; // keccak256(sig)
+const GOLDEN   = (2n ** 256n) - 1n; // designId sentinel for the Golden Queen
+
+async function rpc(method, params) {
+  const r = await fetch(RPC, { method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
+  const j = await r.json();
+  if (j.error) throw new Error(j.error.message);
+  return j.result;
+}
+
+// Page backward in 2000-block windows until we have `limit` items (or hit maxWindows).
+async function fetchRecent(limit = 24, maxWindows = 8) {
+  const latest = Number(BigInt(await rpc("eth_blockNumber")));
+  const WINDOW = 2000;
+  let to = latest, items = [], w = 0;
+  while (items.length < limit && w < maxWindows && to >= 0) {
+    const from = Math.max(0, to - WINDOW + 1);
+    const logs = await rpc("eth_getLogs", [{ address: CONTRACT, topics: [MINTED],
+      fromBlock: "0x" + from.toString(16), toBlock: "0x" + to.toString(16) }]);
+    for (const l of logs) {
+      const tokenId = Number(BigInt(l.topics[2]));      // indexed
+      const design  = BigInt(l.data);                   // designId (data word)
+      items.push({
+        tokenId,
+        isGolden: design === GOLDEN,
+        designId: design === GOLDEN ? -1 : Number(design),
+        ts: Number(BigInt(l.blockTimestamp)),           // Base includes this on each log
+      });
+    }
+    to = from - 1;
+    w++;
+  }
+  items.sort((a, b) => b.ts - a.ts || b.tokenId - a.tokenId);
+  return items.slice(0, limit);
+}
+
+function ago(sec) {
+  const d = Math.max(0, Math.floor(Date.now() / 1000) - sec);
+  if (d < 60)    return d + "s ago";
+  if (d < 3600)  return Math.floor(d / 60) + "min ago";
+  if (d < 86400) return Math.floor(d / 3600) + "h ago";
+  return Math.floor(d / 86400) + "d ago";
+}
+
+fetchRecent().then((items) => items.forEach((i) => console.log("Taigaz #" + i.tokenId, ago(i.ts))));
+
+// Number of holders = unique minter addresses across ALL Minted logs
+// (this is a mint-and-keep collection, so minters == holders). Page through
+// every 2000-block window and collect the indexed `to` topic:
+//   const to = "0x" + log.topics[1].slice(26);   // 32-byte topic -> 20-byte address
+//   holders.add(to);
+// For a large/old collection, prefer an indexer (or add an on-chain holder
+// counter in the contract's _update hook) instead of scanning all history.
+</script>
+
+<!-- ==== live implementation (runs the "raw" example above) ======================= -->
+<script>
+const RPC      = "https://sepolia.base.org";
+const CONTRACT = "0x0ad38ee0e296ac688662b0e788f1dbb9bb295d89";
+const CHAIN_ID = 84532; // Base Sepolia
+const REFRESH_MS = 10_000;
+
+const DESIGNS = ["Samurai","Martial Art","Cheerleader","Baby","Books","Bretonne","Lyon","Karaoke K-pop","Cooking","Kimono","Hacker","Aviator","Blueprint","Gaming","Ramen","Fitness"];
+const RARITY  = ["Epic","Common","Rare","Rare","Common","Common","Common","Rare","Common","Epic","Rare","Rare","Rare","Common","Common","Common"];
+// image files (served at IMG_BASE); designId d -> FILES[d], Golden Queen -> GOLDEN_FILE
+const IMG_BASE = "/nft/"; // same host as this page (Vercel serves public/nft)
+const FILES = ["02_samurai.png","03_martial_art.png","04_cheerleader.png","05_baby.png","06_books.png","07_bretonne.png","08_lyon.png","09_karaoke_kpop.png","10_cooking.png","11_kimono.png","12_hacker.png","13_aviator.png","14_blueprint.png","15_gaming.png","16_ramen.png","17_fitness.png"];
+const GOLDEN_FILE = "01_golden_queen.png";
+
+const SEL = { totalMints:"0x1f21bfbf", goldenMintedCount:"0x0b56ea11", mintedCounts:"0x45bf75aa", goldenFound:"0x1323b455", goldenFinderPseudo:"0x4ca83989", holders:"0x8188f71c" };
+
+async function ethCall(data){
+  const r = await fetch(RPC,{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({jsonrpc:"2.0",id:1,method:"eth_call",params:[{to:CONTRACT,data},"latest"]})});
+  const j = await r.json();
+  if(j.error) throw new Error(j.error.message);
+  return j.result;
+}
+const word = (hex,i)=>BigInt("0x"+hex.slice(2+i*64,2+i*64+64));
+const decodeUintArray = (hex)=>{ const len=Number(word(hex,1)); return Array.from({length:len},(_,i)=>Number(word(hex,2+i))); };
+const decodeString = (hex)=>{ const len=Number(word(hex,1)); if(len===0) return ""; const b=hex.slice(2+2*64,2+2*64+len*2); return new TextDecoder().decode(Uint8Array.from(b.match(/../g).map(x=>parseInt(x,16)))); };
+
+async function fetchStats(){
+  const [total,goldens,counts,found,finder] = await Promise.all([
+    ethCall(SEL.totalMints), ethCall(SEL.goldenMintedCount), ethCall(SEL.mintedCounts),
+    ethCall(SEL.goldenFound), ethCall(SEL.goldenFinderPseudo),
+  ]);
+  return {
+    totalMinted:Number(word(total,0)),
+    goldensMinted:Number(word(goldens,0)),
+    perDesign:decodeUintArray(counts),
+    goldenFound:word(found,0)===1n,
+    goldenFinder:decodeString(finder),
+  };
+}
+
+function render(s){
+  const golden = s.goldenFound ? ("👑 found by " + (s.goldenFinder || "?")) : "not found yet";
+  document.getElementById("summary").innerHTML =
+    '<div><span class="big">' + s.totalMinted + '</span> total minted</div>' +
+    '<div><span class="big">' + s.goldensMinted + '</span> Golden Queen(s) minted</div>' +
+    '<div>Golden Queen: ' + golden + '</div>';
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = s.perDesign.map((c,d)=>
+    "<tr><td>"+d+"</td><td>"+(DESIGNS[d]||"?")+"</td><td>"+(RARITY[d]||"")+"</td><td class='num'>"+c+"</td></tr>"
+  ).join("");
+  document.getElementById("table").hidden = false;
+  document.getElementById("updated").textContent = "updated " + new Date().toLocaleTimeString();
+}
+
+// ---- recently found (Minted event logs) ----
+const MINTED = "0x25b428dfde728ccfaddad7e29e4ac23c24ed7fd1a6e3e3f91894a9a073f5dfff";
+const GOLDEN = (2n**256n)-1n;
+async function rpc(method,params){
+  const r=await fetch(RPC,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:1,method,params})});
+  const j=await r.json(); if(j.error) throw new Error(j.error.message); return j.result;
+}
+async function fetchRecent(limit=24,maxWindows=8){
+  const latest=Number(BigInt(await rpc("eth_blockNumber")));
+  const WINDOW=2000; let to=latest, items=[], w=0;
+  while(items.length<limit && w<maxWindows && to>=0){
+    const from=Math.max(0,to-WINDOW+1);
+    const logs=await rpc("eth_getLogs",[{address:CONTRACT,topics:[MINTED],fromBlock:"0x"+from.toString(16),toBlock:"0x"+to.toString(16)}]);
+    for(const l of logs){ const design=BigInt(l.data);
+      items.push({tokenId:Number(BigInt(l.topics[2])),isGolden:design===GOLDEN,designId:design===GOLDEN?-1:Number(design),ts:Number(BigInt(l.blockTimestamp))}); }
+    to=from-1; w++;
+  }
+  items.sort((a,b)=>b.ts-a.ts||b.tokenId-a.tokenId);
+  return items.slice(0,limit);
+}
+function ago(sec){ const d=Math.max(0,Math.floor(Date.now()/1000)-sec);
+  if(d<60) return d+"s ago"; if(d<3600) return Math.floor(d/60)+"min ago"; if(d<86400) return Math.floor(d/3600)+"h ago"; return Math.floor(d/86400)+"d ago"; }
+function renderRecent(items){
+  const el=document.getElementById("recent");
+  document.getElementById("recent-updated").textContent="refreshed "+new Date().toLocaleTimeString();
+  if(!items.length){ el.textContent="no mints in range yet"; return; }
+  el.innerHTML=items.map(i=>{ const name=i.isGolden?"Golden Queen 👑":(DESIGNS[i.designId]||"?");
+    const file=i.isGolden?GOLDEN_FILE:FILES[i.designId];
+    const img=file?"<img src='"+IMG_BASE+file+"' alt='"+name+"' loading='lazy'>":"";
+    return "<div class='cell"+(i.isGolden?" golden":"")+"'>"+img+"<b>Taigaz #"+i.tokenId+"</b><div class='d'>"+name+"</div><div class='t' data-ts='"+i.ts+"'>"+ago(i.ts)+"</div></div>"; }).join("");
+}
+// tick the "X ago" labels every second without re-fetching
+setInterval(()=>document.querySelectorAll("#recent .t").forEach(el=>{ el.textContent=ago(Number(el.dataset.ts)); }),1000);
+
+// exact distinct-holder count — one on-chain read (contract maintains it in _update)
+async function fetchHolders(){ return Number(word(await ethCall(SEL.holders), 0)); }
+
+async function refreshStats(){
+  try { render(await fetchStats()); }
+  catch(e){ document.getElementById("summary").innerHTML = '<span class="err">RPC error: '+e.message+'</span>'; }
+}
+async function refreshHolders(){
+  try { document.getElementById("holders-line").innerHTML =
+    '<span class="big">'+(await fetchHolders())+'</span> holders <span class="muted">(distinct owners)</span>'; }
+  catch(e){ document.getElementById("holders-line").innerHTML = '<span class="err">holders error: '+e.message+'</span>'; }
+}
+async function refreshRecent(){
+  try { renderRecent(await fetchRecent()); }
+  catch(e){ document.getElementById("recent").innerHTML = '<span class="err">getLogs error: '+e.message+'</span>'; }
+}
+
+// config block + code blocks + copy buttons + start the loop
+document.getElementById("cfg").textContent =
+  "contract : " + CONTRACT + "\nchain    : Base Sepolia (" + CHAIN_ID + ")\nrpc      : " + RPC + "\nexplorer : https://sepolia.basescan.org/address/" + CONTRACT;
+
+for (const key of ["abi","viem","raw","recent"]) {
+  const code = document.getElementById("src-"+key).textContent.trim();
+  const pre = document.getElementById("out-"+key);
+  const btn = document.createElement("button");
+  btn.className = "copy"; btn.textContent = "copy";
+  btn.onclick = () => { navigator.clipboard.writeText(code); btn.textContent="copied ✓"; setTimeout(()=>btn.textContent="copy",1200); };
+  pre.appendChild(btn);
+  pre.appendChild(document.createTextNode(code));
+}
+
+// sections auto-refresh independently
+refreshStats();   setInterval(refreshStats,   REFRESH_MS);   // 10s
+refreshRecent();  setInterval(refreshRecent,  REFRESH_MS);   // 10s
+refreshHolders(); setInterval(refreshHolders, REFRESH_MS);   // 10s (single read)
+</script>
+
+</body>
+</html>

@@ -483,6 +483,41 @@
     font-weight:700;color:var(--emerald-deep);font-size:13px;
   }
   .wallet-pop-acct{font-size:12px;font-weight:600;color:var(--muted);word-break:break-all}
+  /* transfer-all: trigger button, then an inline form */
+  .wallet-pop-transfer{
+    display:block;width:100%;margin-top:10px;cursor:pointer;
+    padding:9px 12px;border-radius:11px;
+    border:1.5px solid var(--sakura);background:rgba(255,255,255,.5);
+    color:var(--sakura-deep);font-family:inherit;font-weight:800;font-size:13px;
+    transition:transform .12s ease,background .12s ease;
+  }
+  .wallet-pop-transfer:hover:not(:disabled){transform:translateY(-1px);background:rgba(255,255,255,.8)}
+  .wallet-pop-transfer:disabled{opacity:.45;cursor:not-allowed}
+  .wallet-pop-xfer{
+    margin-top:10px;padding:11px;border-radius:12px;
+    background:rgba(255,120,150,.08);border:1px solid rgba(255,120,150,.22);
+  }
+  .wallet-pop-xfer-title{font-weight:800;font-size:13px;color:var(--sakura-deep)}
+  .wallet-pop-xfer-note{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.4}
+  .wallet-pop-xfer-input{
+    width:100%;margin-top:9px;box-sizing:border-box;
+    padding:9px 10px;border-radius:9px;border:1.5px solid var(--sakura);
+    font-family:inherit;font-size:12.5px;background:#fff;color:var(--plum);
+  }
+  .wallet-pop-xfer-input:focus{outline:none;border-color:var(--sakura-deep)}
+  .wallet-pop-xfer-msg{margin-top:7px;font-size:12px;font-weight:700;color:var(--sakura-deep);word-break:break-word}
+  .wallet-pop-xfer-actions{display:flex;gap:8px;margin-top:10px}
+  .wallet-pop-xfer-cancel,.wallet-pop-xfer-go{
+    flex:1;cursor:pointer;padding:9px 10px;border-radius:10px;
+    font-family:inherit;font-weight:800;font-size:12.5px;border:none;transition:transform .12s ease;
+  }
+  .wallet-pop-xfer-cancel{background:rgba(0,0,0,.06);color:var(--muted)}
+  .wallet-pop-xfer-go{
+    background:linear-gradient(135deg,var(--sakura),var(--sakura-deep));color:#fff;
+    box-shadow:0 8px 18px -8px var(--plum);
+  }
+  .wallet-pop-xfer-go:hover:not(:disabled){transform:translateY(-1px)}
+  .wallet-pop-xfer-go:disabled,.wallet-pop-xfer-cancel:disabled{opacity:.5;cursor:not-allowed}
   /* footer: basescan (left) + logout (right), aligned */
   .wallet-pop-foot{display:flex;align-items:center;justify-content:space-between;margin-top:12px}
   .wallet-pop-foot a,.wallet-pop-foot button{

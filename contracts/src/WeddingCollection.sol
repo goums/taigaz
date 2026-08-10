@@ -66,6 +66,18 @@ contract WeddingCollection is ERC721, Ownable {
     /// @notice Total number of successful mints (pool + golden).
     uint256 public totalMints;
 
+    /// @notice Total golden-queen tokens minted (discovery + completion rewards).
+    uint256 public goldenMintedCount;
+
+    /// @notice Number of distinct wallets that currently hold >= 1 Taigaz.
+    ///         Maintained in {_update}: exact and transfer-aware.
+    uint256 public holders;
+
+    /// @notice Global count of each pool design minted, packed 16 x 16 bits into
+    ///         one slot (design d => (_packedMinted >> d*16) & 0xFFFF). Powers a
+    ///         public "how many of each design" summary in a single read.
+    uint256 internal _packedMinted;
+
     /// @notice Next tokenId to assign (tokens are 1-indexed; 0 is unused).
     uint256 private _nextTokenId = 1;
 
@@ -177,6 +189,20 @@ contract WeddingCollection is ERC721, Ownable {
         _setPseudo(_msgSender(), pseudo);
     }
 
+    /// @notice Transfer every token you pass to `to` in a single call.
+    /// @dev    Pass the tokenIds you currently own (enumerate off-chain with
+    ///         {tokensOfOwner}). Each transfer runs the standard ERC721
+    ///         ownership/approval checks, so any id you don't own reverts the
+    ///         whole batch. Uses transferFrom (not safe) to stay compatible with
+    ///         ERC-7579 smart accounts that don't implement onERC721Received —
+    ///         same rationale as _mint in {_mintGolden}.
+    function transferAll(address to, uint256[] calldata tokenIds) external {
+        address from = _msgSender();
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            transferFrom(from, to, tokenIds[i]);
+        }
+    }
+
     function _setPseudo(address who, string calldata pseudo) internal {
         // Skip the SSTORE when unchanged — mintAs(pseudo) is called on every mint
         // with the same value, so this saves gas on all but the first.
@@ -244,6 +270,7 @@ contract WeddingCollection is ERC721, Ownable {
             emit GoldenFound(to, tokenId, pseudoOf[to]);
         }
 
+        goldenMintedCount += 1;
         designOf[tokenId] = GOLDEN_DESIGN;
         // _mint (not _safeMint): the recipient is always the caller's own
         // smart account (ERC-7579 accounts like Kernel don't implement
@@ -262,6 +289,10 @@ contract WeddingCollection is ERC721, Ownable {
         bool newDistinct = prev == 0;
         // Write the incremented count back into the packed slot (one SSTORE).
         _packedCopies[to] = (packed & ~(uint256(0xFFFF) << shift)) | ((prev + 1) << shift);
+
+        // Bump the global per-design tally (packed, one SSTORE) for the summary.
+        uint256 gm = _packedMinted;
+        _packedMinted = (gm & ~(uint256(0xFFFF) << shift)) | ((((gm >> shift) & 0xFFFF) + 1) << shift);
 
         tokenId = _nextTokenId++;
         designOf[tokenId] = designId;
@@ -367,11 +398,12 @@ contract WeddingCollection is ERC721, Ownable {
         return _distinctOwned(_packedCopies[wallet]);
     }
 
-    /// @notice All 16 packed copy counts for a wallet in one word (frontend can
-    ///         decode locally instead of 16 separate reads).
+    /// @notice All 16 packed copy counts for a wallet in one word (frontend
+    ///         decodes locally instead of 16 separate reads).
     function packedCopies(address wallet) external view returns (uint256) {
         return _packedCopies[wallet];
     }
+
 
     /// @notice Rarity/selection weight configured for a design.
     function designWeight(uint256 designId) external view returns (uint256) {
@@ -405,6 +437,21 @@ contract WeddingCollection is ERC721, Ownable {
         return (_packedCopies[wallet] >> (designId * 16)) & 0xFFFF;
     }
 
+    /// @notice Every tokenId currently owned by `wallet`.
+    /// @dev    O(totalSupply) scan — intended for off-chain reads (eth_call),
+    ///         which is how the app builds the {transferAll} tokenId list. Not
+    ///         gas-safe to call from another contract on a large collection.
+    function tokensOfOwner(address wallet) external view returns (uint256[] memory ids) {
+        uint256 bal = balanceOf(wallet);
+        ids = new uint256[](bal);
+        if (bal == 0) return ids;
+        uint256 n;
+        uint256 max = _nextTokenId;
+        for (uint256 id = 1; id < max && n < bal; id++) {
+            if (_ownerOf(id) == wallet) ids[n++] = id;
+        }
+    }
+
     /// @notice Timestamp when `wallet` may mint again (0 if never minted).
     function nextMintAvailableAt(address wallet) external view returns (uint256) {
         uint256 last = lastMintAt[wallet];
@@ -416,9 +463,44 @@ contract WeddingCollection is ERC721, Ownable {
         return block.timestamp >= mintStart && block.timestamp <= mintEnd;
     }
 
+    // --- Public collection stats (for an external dashboard) --------------
+
+    /// @notice Global mint count for a single pool design.
+    function mintedOf(uint256 designId) external view returns (uint256) {
+        if (designId >= POOL_SIZE) revert InvalidDesign();
+        return (_packedMinted >> (designId * 16)) & 0xFFFF;
+    }
+
+    /// @notice Global mint count for every pool design, as a plain array
+    ///         (index = designId). Simple to consume client-side — no bit
+    ///         unpacking needed.
+    function mintedCounts() external view returns (uint256[] memory arr) {
+        arr = new uint256[](POOL_SIZE);
+        uint256 packed = _packedMinted;
+        for (uint256 i = 0; i < POOL_SIZE; i++) {
+            arr[i] = (packed >> (i * 16)) & 0xFFFF;
+        }
+    }
+
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         _requireOwned(tokenId);
         return _designURI[designOf[tokenId]];
+    }
+
+    /// @dev Maintain the distinct-holder count on every mint / transfer / burn.
+    ///      `from` = previous owner (0 on mint), `to` = new owner (0 on burn).
+    ///      After super._update, balances reflect the change: a receiver now at 1
+    ///      is a new holder; a sender now at 0 has left.
+    function _update(address to, uint256 tokenId, address auth)
+        internal
+        override
+        returns (address from)
+    {
+        from = super._update(to, tokenId, auth);
+        if (from != to) {
+            if (to != address(0) && balanceOf(to) == 1) holders += 1;
+            if (from != address(0) && balanceOf(from) == 0) holders -= 1;
+        }
     }
 
     // =======================================================================

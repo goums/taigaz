@@ -280,6 +280,105 @@ contract WeddingCollectionTest is Test {
         assertEq(nft.balanceOf(address(acct)), 1);
     }
 
+    /// @dev The public summary tracks total mints and per-design global counts.
+    function test_SummaryTracksGlobalCounts() public {
+        // alice + bob each mint a few; tally per-design counts across everyone.
+        uint256 total;
+        uint256[16] memory expected;
+        address[2] memory users = [alice, bob];
+        for (uint256 u = 0; u < users.length; u++) {
+            for (uint256 i = 0; i < 5; i++) {
+                uint256 id = _mint(users[u]);
+                uint256 d = nft.designOf(id);
+                if (d < POOL) { expected[d]++; total++; }
+            }
+        }
+
+        assertEq(nft.totalMints(), total); // no goldens in this short run
+        assertEq(nft.goldenMintedCount(), 0);
+
+        uint256[] memory counts = nft.mintedCounts();
+        assertEq(counts.length, POOL);
+        uint256 sum;
+        for (uint256 d = 0; d < POOL; d++) {
+            assertEq(counts[d], expected[d]);
+            assertEq(nft.mintedOf(d), expected[d]);
+            sum += counts[d];
+        }
+        assertEq(sum, total); // per-design counts sum to the pool total
+    }
+
+    /// @dev The on-chain holder counter tracks distinct owners across mints and
+    ///      transfers (exact, one read).
+    function test_HolderCountTracksMintsAndTransfers() public {
+        assertEq(nft.holders(), 0);
+
+        // alice mints twice -> still 1 holder.
+        uint256 a1 = _mint(alice);
+        assertEq(nft.holders(), 1);
+        _mint(alice);
+        assertEq(nft.holders(), 1);
+
+        // bob mints -> 2 holders.
+        _mint(bob);
+        assertEq(nft.holders(), 2);
+
+        // alice transfers one of her two tokens to carol -> 3 holders.
+        address carol = makeAddr("carol");
+        vm.prank(alice);
+        nft.transferFrom(alice, carol, a1);
+        assertEq(nft.holders(), 3);
+
+        // alice transfers her remaining token to carol -> alice leaves -> 2 holders.
+        uint256 a2; // find another token alice still owns
+        for (uint256 id = 1; id <= nft.totalMints(); id++) {
+            if (nft.ownerOf(id) == alice) { a2 = id; break; }
+        }
+        vm.prank(alice);
+        nft.transferFrom(alice, carol, a2);
+        assertEq(nft.holders(), 2); // alice gone, carol still counted once
+    }
+
+    function test_TransferAllMovesEveryTokenInOneCall() public {
+        // alice mints a few tokens (helper spaces them past the cooldown).
+        for (uint256 i = 0; i < 4; i++) {
+            _mint(alice);
+        }
+        uint256 bal = nft.balanceOf(alice);
+        assertGt(bal, 1);
+
+        uint256[] memory ids = nft.tokensOfOwner(alice);
+        assertEq(ids.length, bal);
+
+        address carol = makeAddr("carol");
+        vm.prank(alice);
+        nft.transferAll(carol, ids);
+
+        assertEq(nft.balanceOf(alice), 0);
+        assertEq(nft.balanceOf(carol), bal);
+        assertEq(nft.holders(), 1); // alice left, carol arrived
+        for (uint256 i = 0; i < ids.length; i++) {
+            assertEq(nft.ownerOf(ids[i]), carol);
+        }
+    }
+
+    function test_TransferAllRevertsIfNotOwnerOfAnyToken() public {
+        uint256 a1 = _mint(alice);
+        uint256 b1 = _mint(bob);
+
+        uint256[] memory ids = new uint256[](2);
+        ids[0] = a1;
+        ids[1] = b1; // alice does not own this one
+
+        address carol = makeAddr("carol");
+        vm.prank(alice);
+        vm.expectRevert();
+        nft.transferAll(carol, ids);
+
+        // Batch is atomic: the first token stayed with alice.
+        assertEq(nft.ownerOf(a1), alice);
+    }
+
     /// @dev mintAs sets the pseudo used at golden-claim time in one call.
     function test_MintAsSetsPseudo() public {
         vm.prank(alice);

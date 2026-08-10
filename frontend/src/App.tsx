@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePrivy, useGuestAccounts, useLogin } from "@privy-io/react-auth";
 import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
 import {
-  createPublicClient, http, encodeFunctionData, parseEventLogs, maxUint256,
+  createPublicClient, http, encodeFunctionData, parseEventLogs, maxUint256, isAddress,
 } from "viem";
 import {
   CHAIN, CONTRACT_ADDRESS, POOL_SIZE, RPC_URL, EXPLORER, OPENSEA, RARIBLE,
@@ -119,6 +119,16 @@ export default function App() {
 
   const [walletOpen, setWalletOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // "Transfer all" flow (inside the wallet popover).
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferTo, setTransferTo] = useState("");
+  const [transferring, setTransferring] = useState(false);
+  const [transferMsg, setTransferMsg] = useState("");
+  // Actual tokenIds currently held (from tokensOfOwner), loaded when the form
+  // opens. Distinct from state.distinct, which counts minted copies and does NOT
+  // decrease when tokens are transferred away. null = still loading.
+  const [transferIds, setTransferIds] = useState<bigint[] | null>(null);
 
   const smartAddress = client?.account?.address as `0x${string}` | undefined;
   const isGuest = Boolean(user?.isGuest);
@@ -395,9 +405,78 @@ export default function App() {
     try { linkEmail(); } catch { /* opens Privy modal */ }
   }, [linkEmail]);
 
+  // Open the transfer form and load the tokenIds actually held right now, so the
+  // count reflects current ownership (not the never-decreasing minted tally).
+  const openTransfer = useCallback(async () => {
+    if (!smartAddress) return;
+    setTransferMsg("");
+    setTransferTo("");
+    setTransferIds(null);
+    setTransferOpen(true);
+    try {
+      const ids = (await publicClient.readContract({
+        address: CONTRACT_ADDRESS, abi: weddingAbi, functionName: "tokensOfOwner", args: [smartAddress],
+      })) as bigint[];
+      setTransferIds(ids);
+    } catch {
+      setTransferIds([]);
+    }
+  }, [smartAddress]);
+
+  // Transfer the wallet's entire collection to another address in one tx.
+  const transferAll = useCallback(async () => {
+    if (!client || transferring || !smartAddress) return;
+    const to = transferTo.trim();
+    if (!isAddress(to)) { setTransferMsg(t("transfer_bad_addr")); return; }
+    if (to.toLowerCase() === smartAddress.toLowerCase()) { setTransferMsg(t("transfer_same_addr")); return; }
+
+    setTransferring(true);
+    setTransferMsg("");
+    try {
+      // Re-read right before sending so the batch reflects the latest ownership
+      // (guards against a token moved since the form opened).
+      const ids = (await publicClient.readContract({
+        address: CONTRACT_ADDRESS, abi: weddingAbi, functionName: "tokensOfOwner", args: [smartAddress],
+      })) as bigint[];
+      setTransferIds(ids);
+      if (!ids.length) { setTransferMsg(t("transfer_none")); setTransferring(false); return; }
+
+      setTransferMsg(t("transferring"));
+      const data = encodeFunctionData({
+        abi: weddingAbi, functionName: "transferAll", args: [to as `0x${string}`, ids],
+      });
+      // Gas scales with the number of tokens moved; give the userOp headroom.
+      const hash = await client.sendTransaction({
+        account: client.account,
+        calls: [{ to: CONTRACT_ADDRESS, data }],
+        callGasLimit: BigInt(120000 + ids.length * 45000),
+      } as any);
+      await publicClient.waitForTransactionReceipt({ hash });
+
+      setTransferMsg(t("transfer_done", ids.length));
+      setToast({ hash });
+      // Reset local view: the wallet is now empty.
+      const fresh = await readState(smartAddress).catch(() => null);
+      if (fresh) setState(fresh);
+      setTransferTo("");
+      setTransferIds(null);
+      setTransferOpen(false);
+      setWalletOpen(false);
+    } catch (e: any) {
+      console.error("[taigaz] transferAll FAILED:", e?.shortMessage || e?.message, e);
+      setTransferMsg(e?.shortMessage ?? e?.message ?? "Transfer failed");
+    } finally {
+      setTransferring(false);
+    }
+  }, [client, transferring, smartAddress, transferTo, t]);
+
   // Disconnect and return to the home (connect) screen.
   const handleLogout = useCallback(async () => {
     setWalletOpen(false);
+    setTransferOpen(false);
+    setTransferTo("");
+    setTransferMsg("");
+    setTransferIds(null);
     try { await logout(); } catch { /* ignore */ }
     setInApp(false);
     setNicknamePrompt(false);
@@ -555,6 +634,51 @@ export default function App() {
                           <span className="wallet-pop-acct">{linkedLabel}</span>
                         </div>
                       ) : null}
+
+                      {!transferOpen ? (
+                        <button
+                          className="wallet-pop-transfer"
+                          onClick={openTransfer}
+                          disabled={state.distinct === 0}
+                        >
+                          {t("transfer_all")}
+                        </button>
+                      ) : (
+                        <div className="wallet-pop-xfer">
+                          <div className="wallet-pop-xfer-title">{t("transfer_all_title")}</div>
+                          <div className="wallet-pop-xfer-note">{t("transfer_all_note")}</div>
+                          <input
+                            className="wallet-pop-xfer-input"
+                            value={transferTo}
+                            onChange={(e) => { setTransferTo(e.target.value); setTransferMsg(""); }}
+                            placeholder={t("transfer_to_placeholder")}
+                            spellCheck={false}
+                            autoComplete="off"
+                            disabled={transferring}
+                          />
+                          {transferMsg && <div className="wallet-pop-xfer-msg">{transferMsg}</div>}
+                          <div className="wallet-pop-xfer-actions">
+                            <button
+                              className="wallet-pop-xfer-cancel"
+                              onClick={() => { setTransferOpen(false); setTransferTo(""); setTransferMsg(""); setTransferIds(null); }}
+                              disabled={transferring}
+                            >
+                              {t("transfer_cancel")}
+                            </button>
+                            <button
+                              className="wallet-pop-xfer-go"
+                              onClick={transferAll}
+                              disabled={transferring || !transferTo.trim() || !transferIds || transferIds.length === 0}
+                            >
+                              {transferring
+                                ? t("transferring")
+                                : transferIds === null
+                                  ? "…"
+                                  : t("transfer_confirm", transferIds.length)}
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       <div className="wallet-pop-foot">
                         <a href={`${EXPLORER}/address/${smartAddress}`} target="_blank" rel="noopener noreferrer">{t("view_explorer")}</a>
