@@ -629,7 +629,7 @@ export default function App() {
                       <img className="art-img" src={owned ? item.img : PLACEHOLDER} alt={owned ? item.name : ""} draggable={false} />
                       {owned && count > 1 && <span className="badge">×{count}</span>}
                       {!owned && <span className="lock">🔒</span>}
-                      <span className="cap"><b>{item.name}</b><i style={{ color: RARITY_COLOR[item.rarity] }}>{tRarity(lang, item.rarity)}</i></span>
+                      <span className="cap"><b>{owned ? item.name : "???"}</b><i style={{ color: RARITY_COLOR[item.rarity] }}>{tRarity(lang, item.rarity)}</i></span>
                     </div>
                   );
                 })}
