@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { PrivyProvider } from "@privy-io/react-auth";
 import { SmartWalletsProvider } from "@privy-io/react-auth/smart-wallets";
+import { Analytics } from "@vercel/analytics/react";
 import { CHAIN, PRIVY_APP_ID } from "./config";
 import App from "./App";
 
@@ -36,6 +37,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <SmartWalletsProvider>
         <App />
       </SmartWalletsProvider>
+      <Analytics />
     </PrivyProvider>
   </React.StrictMode>
 );
