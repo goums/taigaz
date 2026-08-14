@@ -27,7 +27,8 @@ console.info(
 export const POOL_SIZE = 16;
 
 // Block just before the contract was deployed — bounds getLogs queries.
-export const DEPLOY_BLOCK = 44779000n;
+// Base mainnet 0x84d8…b34c deploy block 49866361 (Sepolia was ~44779000).
+export const DEPLOY_BLOCK = CHAIN_ID === 8453 ? 49866360n : 44779000n;
 
 // Block explorer + marketplace bases (testnet).
 export const EXPLORER =

@@ -31,7 +31,7 @@
 <h1>Taigaz — on-chain collection stats</h1>
 <p class="muted">
   Read-only. No wallet, no signing, no dependencies required. Everything below is fetched
-  straight from a Base Sepolia RPC and refreshed on an interval. Copy any block to reuse.
+  straight from a Base mainnet RPC and refreshed on an interval. Copy any block to reuse.
 </p>
 
 <h2>Config</h2>
@@ -89,9 +89,9 @@
 <script type="text/plain" id="src-viem">
 // npm i viem   (or import from a CDN as below)
 import { createPublicClient, http } from "https://esm.sh/viem@2";
-import { baseSepolia } from "https://esm.sh/viem@2/chains";
+import { base } from "https://esm.sh/viem@2/chains";
 
-const CONTRACT = "0x0ad38ee0e296ac688662b0e788f1dbb9bb295d89";
+const CONTRACT = "0x84d8ded053a822fd5c10f03b7843e4fed3eeb34c";
 const abi = [
   { type: "function", name: "totalMints",         stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "goldenMintedCount",  stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
@@ -101,7 +101,7 @@ const abi = [
   { type: "function", name: "goldenFinderPseudo", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
 ];
 
-const client = createPublicClient({ chain: baseSepolia, transport: http("https://sepolia.base.org") });
+const client = createPublicClient({ chain: base, transport: http("https://mainnet.base.org") });
 
 async function fetchStats() {
   const [total, goldens, counts, holders, found, finder] = await client.multicall({
@@ -132,8 +132,8 @@ setInterval(() => fetchStats().then(console.log), 10_000);
 
 <script type="text/plain" id="src-raw">
 // No libraries. Plain fetch + eth_call + hand-decoding the ABI return data.
-const RPC      = "https://sepolia.base.org";
-const CONTRACT = "0x0ad38ee0e296ac688662b0e788f1dbb9bb295d89";
+const RPC      = "https://mainnet.base.org";
+const CONTRACT = "0x84d8ded053a822fd5c10f03b7843e4fed3eeb34c";
 
 // 4-byte function selectors (keccak256(signature)[:4])
 const SEL = {
@@ -199,8 +199,8 @@ setInterval(() => fetchStats().then(console.log), 10_000);
 <script type="text/plain" id="src-recent">
 // Recently minted Taigaz, most recent first, with token id + "X ago".
 // Minted(address indexed to, uint256 indexed tokenId, uint256 designId)
-const RPC      = "https://sepolia.base.org";
-const CONTRACT = "0x0ad38ee0e296ac688662b0e788f1dbb9bb295d89";
+const RPC      = "https://mainnet.base.org";
+const CONTRACT = "0x84d8ded053a822fd5c10f03b7843e4fed3eeb34c";
 const MINTED   = "0x25b428dfde728ccfaddad7e29e4ac23c24ed7fd1a6e3e3f91894a9a073f5dfff"; // keccak256(sig)
 const GOLDEN   = (2n ** 256n) - 1n; // designId sentinel for the Golden Queen
 
@@ -259,9 +259,9 @@ fetchRecent().then((items) => items.forEach((i) => console.log("Taigaz #" + i.to
 
 <!-- ==== live implementation (runs the "raw" example above) ======================= -->
 <script>
-const RPC      = "https://sepolia.base.org";
-const CONTRACT = "0x0ad38ee0e296ac688662b0e788f1dbb9bb295d89";
-const CHAIN_ID = 84532; // Base Sepolia
+const RPC      = "https://mainnet.base.org";
+const CONTRACT = "0x84d8ded053a822fd5c10f03b7843e4fed3eeb34c";
+const CHAIN_ID = 8453; // Base mainnet
 const REFRESH_MS = 10_000;
 
 const DESIGNS = ["Samurai","Martial Art","Cheerleader","Baby","Books","Bretonne","Lyon","Karaoke K-pop","Cooking","Kimono","Hacker","Aviator","Blueprint","Gaming","Ramen","Fitness"];
@@ -280,19 +280,30 @@ async function ethCall(data){
   if(j.error) throw new Error(j.error.message);
   return j.result;
 }
+// Batch several eth_calls into ONE HTTP request (a JSON-RPC batch) so the public
+// RPC counts it as a single unit — Base mainnet's public endpoint rate-limits a
+// burst of parallel calls, which the summary read would otherwise trip.
+async function ethCallBatch(datas){
+  const r = await fetch(RPC,{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify(datas.map((data,i)=>({jsonrpc:"2.0",id:i,method:"eth_call",params:[{to:CONTRACT,data},"latest"]})))});
+  const j = await r.json();
+  const byId = {};
+  for(const e of j){ if(e.error) throw new Error(e.error.message); byId[e.id]=e.result; }
+  return datas.map((_,i)=>byId[i]);
+}
 const word = (hex,i)=>BigInt("0x"+hex.slice(2+i*64,2+i*64+64));
 const decodeUintArray = (hex)=>{ const len=Number(word(hex,1)); return Array.from({length:len},(_,i)=>Number(word(hex,2+i))); };
 const decodeString = (hex)=>{ const len=Number(word(hex,1)); if(len===0) return ""; const b=hex.slice(2+2*64,2+2*64+len*2); return new TextDecoder().decode(Uint8Array.from(b.match(/../g).map(x=>parseInt(x,16)))); };
 
 async function fetchStats(){
-  const [total,goldens,counts,found,finder] = await Promise.all([
-    ethCall(SEL.totalMints), ethCall(SEL.goldenMintedCount), ethCall(SEL.mintedCounts),
-    ethCall(SEL.goldenFound), ethCall(SEL.goldenFinderPseudo),
+  const [total,goldens,counts,holders,found,finder] = await ethCallBatch([
+    SEL.totalMints, SEL.goldenMintedCount, SEL.mintedCounts, SEL.holders, SEL.goldenFound, SEL.goldenFinderPseudo,
   ]);
   return {
     totalMinted:Number(word(total,0)),
     goldensMinted:Number(word(goldens,0)),
     perDesign:decodeUintArray(counts),
+    holders:Number(word(holders,0)),
     goldenFound:word(found,0)===1n,
     goldenFinder:decodeString(finder),
   };
@@ -304,6 +315,8 @@ function render(s){
     '<div><span class="big">' + s.totalMinted + '</span> total minted</div>' +
     '<div><span class="big">' + s.goldensMinted + '</span> Golden Queen(s) minted</div>' +
     '<div>Golden Queen: ' + golden + '</div>';
+  document.getElementById("holders-line").innerHTML =
+    '<span class="big">'+s.holders+'</span> holders <span class="muted">(distinct owners)</span>';
   const tbody = document.getElementById("tbody");
   tbody.innerHTML = s.perDesign.map((c,d)=>
     "<tr><td>"+d+"</td><td>"+(DESIGNS[d]||"?")+"</td><td>"+(RARITY[d]||"")+"</td><td class='num'>"+c+"</td></tr>"
@@ -346,17 +359,14 @@ function renderRecent(items){
 // tick the "X ago" labels every second without re-fetching
 setInterval(()=>document.querySelectorAll("#recent .t").forEach(el=>{ el.textContent=ago(Number(el.dataset.ts)); }),1000);
 
-// exact distinct-holder count — one on-chain read (contract maintains it in _update)
-async function fetchHolders(){ return Number(word(await ethCall(SEL.holders), 0)); }
-
+// The summary batch also carries the exact distinct-holder count (holders() —
+// the contract maintains it in _update), so no separate holders request/loop.
 async function refreshStats(){
   try { render(await fetchStats()); }
-  catch(e){ document.getElementById("summary").innerHTML = '<span class="err">RPC error: '+e.message+'</span>'; }
-}
-async function refreshHolders(){
-  try { document.getElementById("holders-line").innerHTML =
-    '<span class="big">'+(await fetchHolders())+'</span> holders <span class="muted">(distinct owners)</span>'; }
-  catch(e){ document.getElementById("holders-line").innerHTML = '<span class="err">holders error: '+e.message+'</span>'; }
+  catch(e){
+    document.getElementById("summary").innerHTML = '<span class="err">RPC error: '+e.message+'</span>';
+    document.getElementById("holders-line").innerHTML = '';
+  }
 }
 async function refreshRecent(){
   try { renderRecent(await fetchRecent()); }
@@ -365,7 +375,7 @@ async function refreshRecent(){
 
 // config block + code blocks + copy buttons + start the loop
 document.getElementById("cfg").textContent =
-  "contract : " + CONTRACT + "\nchain    : Base Sepolia (" + CHAIN_ID + ")\nrpc      : " + RPC + "\nexplorer : https://sepolia.basescan.org/address/" + CONTRACT;
+  "contract : " + CONTRACT + "\nchain    : Base mainnet (" + CHAIN_ID + ")\nrpc      : " + RPC + "\nexplorer : https://basescan.org/address/" + CONTRACT;
 
 for (const key of ["abi","viem","raw","recent"]) {
   const code = document.getElementById("src-"+key).textContent.trim();
@@ -378,9 +388,8 @@ for (const key of ["abi","viem","raw","recent"]) {
 }
 
 // sections auto-refresh independently
-refreshStats();   setInterval(refreshStats,   REFRESH_MS);   // 10s
+refreshStats();   setInterval(refreshStats,   REFRESH_MS);   // 10s (summary + holders, one batch)
 refreshRecent();  setInterval(refreshRecent,  REFRESH_MS);   // 10s
-refreshHolders(); setInterval(refreshHolders, REFRESH_MS);   // 10s (single read)
 </script>
 
 </body>
