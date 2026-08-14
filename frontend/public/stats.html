@@ -31,7 +31,8 @@
 <h1>Taigaz — on-chain collection stats</h1>
 <p class="muted">
   Read-only. No wallet, no signing, no dependencies required. Everything below is fetched
-  straight from a Base mainnet RPC and refreshed on an interval. Copy any block to reuse.
+  from Base mainnet — a private (Alchemy) RPC with the public endpoint as fallback — and
+  refreshed on an interval. Copy any block to reuse.
 </p>
 
 <h2>Config</h2>
@@ -69,7 +70,7 @@
 <ul class="muted">
   <li><b>designId → design</b>: id <code>d</code> maps to source file <code>d+2</code> (id 0 = Samurai … id 15 = Fitness). The Golden Queen is separate (not in <code>mintedCounts</code>); use <code>goldenMintedCount()</code>.</li>
   <li><code>totalMints</code> = pool mints + goldens. So <code>sum(mintedCounts) + goldenMintedCount === totalMints</code>.</li>
-  <li>Swap <code>RPC</code> for your own endpoint (Alchemy/Infura) if the public one rate-limits.</li>
+  <li>Each example reads through <code>RPCS</code> — a private (Alchemy) endpoint first, the public RPC as fallback — so a rate-limit or outage on one transparently falls through to the other. Drop in your own endpoints as needed.</li>
   <li>Other useful reads: <code>mintedOf(uint256)</code>, <code>goldenFinder()</code>, <code>goldenFoundAt()</code>, <code>isMintOpen()</code>, <code>mintEnd()</code>.</li>
 </ul>
 
@@ -88,10 +89,14 @@
 
 <script type="text/plain" id="src-viem">
 // npm i viem   (or import from a CDN as below)
-import { createPublicClient, http } from "https://esm.sh/viem@2";
+import { createPublicClient, http, fallback } from "https://esm.sh/viem@2";
 import { base } from "https://esm.sh/viem@2/chains";
 
 const CONTRACT = "0x84d8ded053a822fd5c10f03b7843e4fed3eeb34c";
+// Resiliency: try the private (Alchemy) endpoint first, fall back to the public
+// RPC if it errors or rate-limits. viem's fallback() transport handles this.
+const RPC_PRIVATE = "https://base-mainnet.g.alchemy.com/v2/alch_zsAFYNuDDStjtBab1jeOO";
+const RPC_PUBLIC  = "https://mainnet.base.org";
 const abi = [
   { type: "function", name: "totalMints",         stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "goldenMintedCount",  stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
@@ -101,7 +106,10 @@ const abi = [
   { type: "function", name: "goldenFinderPseudo", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
 ];
 
-const client = createPublicClient({ chain: base, transport: http("https://mainnet.base.org") });
+const client = createPublicClient({
+  chain: base,
+  transport: fallback([http(RPC_PRIVATE), http(RPC_PUBLIC)]),
+});
 
 async function fetchStats() {
   const [total, goldens, counts, holders, found, finder] = await client.multicall({
@@ -132,8 +140,27 @@ setInterval(() => fetchStats().then(console.log), 10_000);
 
 <script type="text/plain" id="src-raw">
 // No libraries. Plain fetch + eth_call + hand-decoding the ABI return data.
-const RPC      = "https://mainnet.base.org";
 const CONTRACT = "0x84d8ded053a822fd5c10f03b7843e4fed3eeb34c";
+// Resiliency: try the private (Alchemy) endpoint first, fall back to the public
+// RPC on any network / HTTP / JSON-RPC error (e.g. the public one rate-limiting).
+const RPCS = [
+  "https://base-mainnet.g.alchemy.com/v2/alch_zsAFYNuDDStjtBab1jeOO", // private, primary
+  "https://mainnet.base.org",                                          // public, fallback
+];
+async function rpcPost(body) {
+  let lastErr;
+  for (const url of RPCS) {
+    try {
+      const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const j = await r.json();
+      const err = Array.isArray(j) ? j.find((e) => e.error)?.error : j.error;
+      if (err) throw new Error(err.message);
+      return j;
+    } catch (e) { lastErr = e; } // try the next endpoint
+  }
+  throw lastErr;
+}
 
 // 4-byte function selectors (keccak256(signature)[:4])
 const SEL = {
@@ -146,13 +173,7 @@ const SEL = {
 };
 
 async function ethCall(data) {
-  const r = await fetch(RPC, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call", params: [{ to: CONTRACT, data }, "latest"] }),
-  });
-  const j = await r.json();
-  if (j.error) throw new Error(j.error.message);
+  const j = await rpcPost({ jsonrpc: "2.0", id: 1, method: "eth_call", params: [{ to: CONTRACT, data }, "latest"] });
   return j.result; // 0x-prefixed hex
 }
 
@@ -199,17 +220,29 @@ setInterval(() => fetchStats().then(console.log), 10_000);
 <script type="text/plain" id="src-recent">
 // Recently minted Taigaz, most recent first, with token id + "X ago".
 // Minted(address indexed to, uint256 indexed tokenId, uint256 designId)
-const RPC      = "https://mainnet.base.org";
 const CONTRACT = "0x84d8ded053a822fd5c10f03b7843e4fed3eeb34c";
 const MINTED   = "0x25b428dfde728ccfaddad7e29e4ac23c24ed7fd1a6e3e3f91894a9a073f5dfff"; // keccak256(sig)
 const GOLDEN   = (2n ** 256n) - 1n; // designId sentinel for the Golden Queen
-
+// For eth_getLogs the public RPC goes FIRST: Alchemy's free tier caps getLogs at
+// a 10-block range (400s on the 2000-block windows below), while the public
+// endpoint allows the wide range. Private stays as a last-resort fallback.
+const RPCS = [
+  "https://mainnet.base.org",                                          // public, primary for logs
+  "https://base-mainnet.g.alchemy.com/v2/alch_zsAFYNuDDStjtBab1jeOO",  // private, fallback
+];
 async function rpc(method, params) {
-  const r = await fetch(RPC, { method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
-  const j = await r.json();
-  if (j.error) throw new Error(j.error.message);
-  return j.result;
+  let lastErr;
+  for (const url of RPCS) {
+    try {
+      const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const j = await r.json();
+      if (j.error) throw new Error(j.error.message);
+      return j.result;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr;
 }
 
 // Page backward in 2000-block windows until we have `limit` items (or hit maxWindows).
@@ -259,10 +292,38 @@ fetchRecent().then((items) => items.forEach((i) => console.log("Taigaz #" + i.to
 
 <!-- ==== live implementation (runs the "raw" example above) ======================= -->
 <script>
-const RPC      = "https://mainnet.base.org";
+// Resiliency: private (Alchemy) endpoint first, public RPC as fallback. The
+// Alchemy key is a public read-only frontend key (it also ships in the app
+// bundle), so exposing it here is fine.
+const RPCS = [
+  "https://base-mainnet.g.alchemy.com/v2/alch_zsAFYNuDDStjtBab1jeOO", // private, primary
+  "https://mainnet.base.org",                                          // public, fallback
+];
 const CONTRACT = "0x84d8ded053a822fd5c10f03b7843e4fed3eeb34c";
 const CHAIN_ID = 8453; // Base mainnet
 const REFRESH_MS = 10_000;
+
+// eth_getLogs over a wide block range needs the public RPC first: Alchemy's free
+// tier caps getLogs at a 10-block range (400s on our 2000-block windows), so for
+// the log scan we prefer public and keep the private one only as a last resort.
+const RPCS_LOGS = [RPCS[1], RPCS[0]];
+
+// POST a JSON-RPC body (single object or a batch array), trying each endpoint in
+// order until one answers cleanly. Falls back on network / HTTP / JSON-RPC error.
+async function rpcPost(body, endpoints = RPCS){
+  let lastErr;
+  for(const url of endpoints){
+    try{
+      const r = await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const j = await r.json();
+      const err = Array.isArray(j) ? j.find(e=>e.error)?.error : j.error;
+      if(err) throw new Error(err.message);
+      return j;
+    }catch(e){ lastErr = e; }
+  }
+  throw lastErr;
+}
 
 const DESIGNS = ["Samurai","Martial Art","Cheerleader","Baby","Books","Bretonne","Lyon","Karaoke K-pop","Cooking","Kimono","Hacker","Aviator","Blueprint","Gaming","Ramen","Fitness"];
 const RARITY  = ["Epic","Common","Rare","Rare","Common","Common","Common","Rare","Common","Epic","Rare","Rare","Rare","Common","Common","Common"];
@@ -274,21 +335,16 @@ const GOLDEN_FILE = "01_golden_queen.png";
 const SEL = { totalMints:"0x1f21bfbf", goldenMintedCount:"0x0b56ea11", mintedCounts:"0x45bf75aa", goldenFound:"0x1323b455", goldenFinderPseudo:"0x4ca83989", holders:"0x8188f71c" };
 
 async function ethCall(data){
-  const r = await fetch(RPC,{method:"POST",headers:{"content-type":"application/json"},
-    body:JSON.stringify({jsonrpc:"2.0",id:1,method:"eth_call",params:[{to:CONTRACT,data},"latest"]})});
-  const j = await r.json();
-  if(j.error) throw new Error(j.error.message);
+  const j = await rpcPost({jsonrpc:"2.0",id:1,method:"eth_call",params:[{to:CONTRACT,data},"latest"]});
   return j.result;
 }
-// Batch several eth_calls into ONE HTTP request (a JSON-RPC batch) so the public
-// RPC counts it as a single unit — Base mainnet's public endpoint rate-limits a
-// burst of parallel calls, which the summary read would otherwise trip.
+// Batch several eth_calls into ONE HTTP request (a JSON-RPC batch) so a rate-
+// limited endpoint counts it as a single unit — Base mainnet's public RPC
+// throttles a burst of parallel calls, which the summary read would otherwise trip.
 async function ethCallBatch(datas){
-  const r = await fetch(RPC,{method:"POST",headers:{"content-type":"application/json"},
-    body:JSON.stringify(datas.map((data,i)=>({jsonrpc:"2.0",id:i,method:"eth_call",params:[{to:CONTRACT,data},"latest"]})))});
-  const j = await r.json();
+  const j = await rpcPost(datas.map((data,i)=>({jsonrpc:"2.0",id:i,method:"eth_call",params:[{to:CONTRACT,data},"latest"]})));
   const byId = {};
-  for(const e of j){ if(e.error) throw new Error(e.error.message); byId[e.id]=e.result; }
+  for(const e of j) byId[e.id]=e.result;
   return datas.map((_,i)=>byId[i]);
 }
 const word = (hex,i)=>BigInt("0x"+hex.slice(2+i*64,2+i*64+64));
@@ -329,8 +385,8 @@ function render(s){
 const MINTED = "0x25b428dfde728ccfaddad7e29e4ac23c24ed7fd1a6e3e3f91894a9a073f5dfff";
 const GOLDEN = (2n**256n)-1n;
 async function rpc(method,params){
-  const r=await fetch(RPC,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:1,method,params})});
-  const j=await r.json(); if(j.error) throw new Error(j.error.message); return j.result;
+  const j = await rpcPost({jsonrpc:"2.0",id:1,method,params}, RPCS_LOGS);
+  return j.result;
 }
 async function fetchRecent(limit=24,maxWindows=8){
   const latest=Number(BigInt(await rpc("eth_blockNumber")));
@@ -375,7 +431,11 @@ async function refreshRecent(){
 
 // config block + code blocks + copy buttons + start the loop
 document.getElementById("cfg").textContent =
-  "contract : " + CONTRACT + "\nchain    : Base mainnet (" + CHAIN_ID + ")\nrpc      : " + RPC + "\nexplorer : https://basescan.org/address/" + CONTRACT;
+  "contract : " + CONTRACT +
+  "\nchain    : Base mainnet (" + CHAIN_ID + ")" +
+  "\nrpc      : " + RPCS[0] + "   (private, primary)" +
+  "\n           " + RPCS[1] + "                       (public, fallback)" +
+  "\nexplorer : https://basescan.org/address/" + CONTRACT;
 
 for (const key of ["abi","viem","raw","recent"]) {
   const code = document.getElementById("src-"+key).textContent.trim();
